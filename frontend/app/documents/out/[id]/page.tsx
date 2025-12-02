@@ -1,0 +1,410 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BrowserMultiFormatReader } from "@zxing/browser";
+import { useRouter } from "next/navigation";
+import ChevronLeftIcon from "../../../UI/ChevronLeftIcon";
+import ChevronRightIcon from "../../../UI/ChevronRightIcon";
+import KeyIcon from "../../../UI/KeyIcon";
+import LogoutIcon from "../../../UI/LogoutIcon";
+import PlusIcon from "../../../UI/PlusIcon";
+import MinusIcon from "../../../UI/MinusIcon";
+
+import ArrowUpFromLineIcon from "../../../UI/ArrowUpFromLineIcon";
+import CameraIcon from "../../../UI/CameraIcon";
+import ScanIcon from "../../../UI/ScanIcon";
+import SaveIcon from "../../../UI/SaveIcon";
+import SendIcon from "../../../UI/SendIcon";
+
+const docs = [
+  {
+    id: "001234",
+    date: "15.05.2024",
+    title: "ՀՀ Առողջապահության նախարարություն",
+  },
+  {
+    id: "001235",
+    date: "16.05.2024",
+    title: "Արմենիա ՍՊԸ",
+  },
+  {
+    id: "001236",
+    date: "17.05.2024",
+    title: "Սիլ-Կո ՌՓԲԸ",
+  },
+];
+
+const baseItems = [
+  { code: "SIL-2024-201", desc: "F-18-20", total: 60, current: 0 },
+  { code: "SIL-2024-202", desc: "G-22-11", total: 25, current: 0 },
+  { code: "SIL-2024-203", desc: "H-14-07", total: 40, current: 0 },
+  { code: "9785353004325", desc: "Book barcode test", total: 1, current: 0 },
+];
+
+export default function OutOrderDetail({ params }: { params: { id: string } }) {
+  const router = useRouter();
+  const doc = useMemo(() => docs.find((d) => d.id === params.id), [params.id]);
+  const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
+  const [items, setItems] = useState(baseItems);
+  const itemsRef = useRef(baseItems);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const zxingRef = useRef<BrowserMultiFormatReader | null>(null);
+  const zxingControlsRef = useRef<{ stop?: () => void } | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const detectorRef = useRef<BarcodeDetector | null>(null);
+  const [barcode, setBarcode] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const lastScanRef = useRef<{ code: string; time: number } | null>(null);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const handleDetection = (raw: string) => {
+      const code = raw.trim();
+      if (!code) return;
+      const now = Date.now();
+      if (
+        lastScanRef.current &&
+        lastScanRef.current.code === code &&
+        now - lastScanRef.current.time < 1000
+      ) {
+        return;
+      }
+
+      setBarcode(code);
+      const match = itemsRef.current.find((i) => i.code === code);
+      if (match) {
+        setScanError(null);
+        updateItem(code, 1);
+        setHighlighted(code);
+        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = setTimeout(() => setHighlighted(null), 1200);
+        const target = itemRefs.current[code];
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        setTab("manual"); // close camera after successful scan
+      } else {
+        setScanError("Բարկոդը չի գտնվել ապրանքների ցանկում");
+      }
+      lastScanRef.current = { code, time: now };
+    };
+
+    const startCamera = async () => {
+      const hasDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
+      if (hasDetector) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+          });
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            await videoRef.current.play();
+          }
+          await startScanDetector(handleDetection);
+        } catch {
+          // ignore for now; could surface error toast if needed
+        }
+      } else {
+        await startZxing(handleDetection);
+      }
+    };
+
+    const startZxing = async (onDetected: (code: string) => void) => {
+      if (!videoRef.current) return;
+      const reader = new BrowserMultiFormatReader();
+      zxingRef.current = reader;
+      try {
+        const controls = await reader.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          (result, err) => {
+            if (result?.getText()) {
+              onDetected(result.getText());
+            } else if (err && err.name !== "NotFoundException") {
+              setScanError("Չհաջողվեց ընթերցել բարկոդը");
+            }
+          }
+        );
+        zxingControlsRef.current = controls as unknown as { stop?: () => void };
+      } catch {
+        setScanError("Բարկոդ ընթերցումը հասանելի չէ այս սարքում");
+      }
+    };
+
+    const startScanDetector = async (onDetected: (code: string) => void) => {
+      if (typeof window === "undefined") return;
+      if (!("BarcodeDetector" in window)) {
+        return;
+      }
+      if (!detectorRef.current) {
+        detectorRef.current = new BarcodeDetector({
+          formats: ["code_128", "ean_13", "ean_8", "qr_code"],
+        });
+      }
+      const scan = async () => {
+        if (!videoRef.current || !detectorRef.current) return;
+        try {
+          const barcodes = await detectorRef.current.detect(videoRef.current);
+          if (barcodes.length > 0) {
+            const raw = barcodes[0].rawValue ?? "";
+            onDetected(raw);
+          }
+        } catch {
+          setScanError("Չհաջողվեց ընթերցել բարկոդը");
+        }
+        rafRef.current = requestAnimationFrame(scan);
+      };
+      scan();
+    };
+
+    const stopCamera = () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      // ZXing reader cleanup
+      zxingRef.current = null;
+      if (zxingControlsRef.current?.stop) {
+        zxingControlsRef.current.stop();
+        zxingControlsRef.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      detectorRef.current = null;
+      setBarcode(null);
+      setScanError(null);
+      lastScanRef.current = null;
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = null;
+      }
+    };
+
+    if (tab === "camera") {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+
+    return stopCamera;
+  }, [tab]);
+
+  const updateItem = (code: string, delta: number) => {
+    setItems((prev) => {
+      const updated = prev.map((item) => {
+        if (item.code !== code) return item;
+        const next = Math.min(item.total, Math.max(0, item.current + delta));
+        return { ...item, current: next };
+      });
+      itemsRef.current = updated;
+      return updated;
+    });
+  };
+
+  return (
+    <div className="App">
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 w-full border-b border-border bg-card shadow-sm">
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push("/documents/out")}
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
+              >
+                <ChevronLeftIcon className="h-5 w-5" />
+              </button>
+              <h1 className="text-lg font-semibold text-foreground">
+                Պատվեր № {params.id}
+              </h1>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0">
+                <KeyIcon className="h-4 w-4" />
+              </button>
+              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0">
+                <LogoutIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-6 pb-20">
+          <div className="space-y-4">
+            <div className="rounded-xl border bg-card text-card-foreground shadow">
+              <div className="flex flex-col space-y-1.5 p-6 pb-3">
+                <div className="font-semibold tracking-tight text-base">
+                  Պատվերի տվյալներ
+                </div>
+              </div>
+              <div className="p-6 pt-0 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ամսաթիվ:</span>
+                  <span className="font-medium">{doc?.date ?? "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Պատվիրատու:</span>
+                  <span className="font-medium">{doc?.title ?? "—"}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card text-card-foreground shadow">
+              <div className="p-6 pt-6">
+                <div dir="ltr" data-orientation="horizontal" className="w-full">
+                  <div
+                    role="tablist"
+                    aria-orientation="horizontal"
+                    className="h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full grid-cols-3"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === "manual"}
+                      data-state={tab === "manual" ? "active" : "inactive"}
+                      onClick={() => setTab("manual")}
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
+                    >
+                      <PlusIcon className="h-3.5 w-3.5 mr-1" />
+                      Ձեռքով
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === "camera"}
+                      data-state={tab === "camera" ? "active" : "inactive"}
+                      onClick={() => setTab("camera")}
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
+                    >
+                      <CameraIcon className="h-3.5 w-3.5 mr-1" />
+                      Տեսախցիկ
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === "device"}
+                      data-state={tab === "device" ? "active" : "inactive"}
+                      onClick={() => setTab("device")}
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
+                    >
+                      <ScanIcon className="h-3.5 w-3.5 mr-1" />
+                      Սարք
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card text-card-foreground shadow">
+              <div className="flex flex-col space-y-1.5 p-6 pb-3">
+                <div className="font-semibold tracking-tight text-base">
+                  Ապրանքներ
+                </div>
+              </div>
+              <div className="p-0 space-y-0">
+                {tab === "camera" && (
+                  <div className="border-b border-border bg-black/60 text-white">
+                    <video
+                      ref={videoRef}
+                      className="w-full rounded-b-xl"
+                      playsInline
+                      muted
+                    />
+                    <div className="px-4 py-2 text-xs text-white/80 flex justify-between">
+                      <span>{barcode ? `Գտնված բարկոդը: ${barcode}` : "Սկանավորում..."}</span>
+                      {scanError && <span className="text-red-400">{scanError}</span>}
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-0">
+                  {items.map((item, idx) => (
+                    <div
+                      key={item.code}
+                      ref={(el) => {
+                        itemRefs.current[item.code] = el;
+                      }}
+                      className={`p-4 space-y-3 border-b border-border last:border-none ${
+                        highlighted === item.code ? "bg-success-light/40" : ""
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-foreground mb-1">
+                            {item.code}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {item.desc}
+                          </p>
+                        </div>
+                        <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-muted text-muted-foreground border-border shrink-0">
+                          {item.current}/{item.total}
+                        </div>
+                      </div>
+                      {tab === "manual" ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
+                            disabled={item.current <= 0}
+                            onClick={() => updateItem(item.code, -1)}
+                          >
+                            <MinusIcon className="h-4 w-4" />
+                          </button>
+                          <div className="flex-1 text-center">
+                            <span className="text-lg font-semibold">
+                              {item.current}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {" "}
+                              / {item.total}
+                            </span>
+                          </div>
+                          <button
+                            className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
+                            disabled={item.current >= item.total}
+                            onClick={() => updateItem(item.code, 1)}
+                          >
+                            <PlusIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center text-sm text-muted-foreground">
+                          {item.current} / {item.total}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 h-12">
+                <SaveIcon className="mr-2 h-4 w-4" />
+                Պահպանել
+              </button>
+              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2 h-12">
+                <SendIcon className="mr-2 h-4 w-4" />
+                Ուղարկել 1C
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
+      <section
+        aria-label="Notifications alt+T"
+        tabIndex={-1}
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-atomic="false"
+      ></section>
+    </div>
+  );
+}
