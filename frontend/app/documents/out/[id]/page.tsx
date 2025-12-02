@@ -35,9 +35,9 @@ const docs = [
 ];
 
 const baseItems = [
-  { code: "SIL-2024-201", desc: "F-18-20", total: 60, current: 0 },
-  { code: "SIL-2024-202", desc: "G-22-11", total: 25, current: 0 },
-  { code: "SIL-2024-203", desc: "H-14-07", total: 40, current: 0 },
+  { code: "SIL-2024-201", desc: "F-18-20", total: 6, current: 0 },
+  { code: "SIL-2024-202", desc: "G-22-11", total: 3, current: 0 },
+  { code: "SIL-2024-203", desc: "H-14-07", total: 4, current: 0 },
   { code: "9785353004325", desc: "Book barcode test", total: 1, current: 0 },
 ];
 
@@ -59,6 +59,12 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
   const lastScanRef = useRef<{ code: string; time: number } | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const statusColorClass = (current: number, total: number) => {
+    if (current < total) return "text-muted-foreground";
+    if (current === total) return "text-[hsl(var(--success))]";
+    return "text-[hsl(var(--destructive))]";
+  };
 
   useEffect(() => {
     const handleDetection = (raw: string) => {
@@ -202,7 +208,7 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
     setItems((prev) => {
       const updated = prev.map((item) => {
         if (item.code !== code) return item;
-        const next = Math.min(item.total, Math.max(0, item.current + delta));
+        const next = Math.max(0, item.current + delta);
         return { ...item, current: next };
       });
       itemsRef.current = updated;
@@ -345,20 +351,21 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
                           </p>
                         </div>
                         <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-muted text-muted-foreground border-border shrink-0">
-                          {item.current}/{item.total}
+                          <span className={statusColorClass(item.current, item.total)}>
+                            {item.current}/{item.total}
+                          </span>
                         </div>
                       </div>
                       {tab === "manual" ? (
                         <div className="flex items-center gap-2">
                           <button
                             className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-                            disabled={item.current <= 0}
                             onClick={() => updateItem(item.code, -1)}
                           >
                             <MinusIcon className="h-4 w-4" />
                           </button>
                           <div className="flex-1 text-center">
-                            <span className="text-lg font-semibold">
+                            <span className={`text-lg font-semibold ${statusColorClass(item.current, item.total)}`}>
                               {item.current}
                             </span>
                             <span className="text-sm text-muted-foreground">
@@ -368,7 +375,6 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
                           </div>
                           <button
                             className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-                            disabled={item.current >= item.total}
                             onClick={() => updateItem(item.code, 1)}
                           >
                             <PlusIcon className="h-4 w-4" />
