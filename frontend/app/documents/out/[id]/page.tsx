@@ -35,10 +35,14 @@ const docs = [
 ];
 
 const baseItems = [
-  { code: "SIL-2024-201", desc: "F-18-20", total: 6, current: 0 },
-  { code: "SIL-2024-202", desc: "G-22-11", total: 3, current: 0 },
-  { code: "SIL-2024-203", desc: "H-14-07", total: 4, current: 0 },
-  { code: "9785353004325", desc: "Book barcode test", total: 1, current: 0 },
+  {
+    code: "MED-2024-003",
+    desc: "Վիրակապի նյութեր",
+    location: "C-15-03",
+    total: 3,
+    current: 0,
+  },
+  { code: "9785353004325", desc: "Book barcode test", location: "Test", total: 1, current: 0 },
 ];
 
 export default function OutOrderDetail({ params }: { params: { id: string } }) {
@@ -344,11 +348,14 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-foreground mb-1">
-                            {item.code}
-                          </div>
-                          <p className="text-xs text-muted-foreground">
                             {item.desc}
-                          </p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-xs text-muted-foreground">Կոդ: {item.code}</p>
+                            {"location" in item && item.location ? (
+                              <p className="text-xs text-muted-foreground">Հասցե: {item.location}</p>
+                            ) : null}
+                          </div>
                         </div>
                         <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-muted text-muted-foreground border-border shrink-0">
                           <span className={statusColorClass(item.current, item.total)}>
