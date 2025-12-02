@@ -14,7 +14,7 @@ import ScanIcon from "../../UI/ScanIcon";
 
 export default function DocumentsInPage() {
   const router = useRouter();
-  const [tab, setTab] = useState<"manual" | "camera" | "device">("device");
+  const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const zxingRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -23,8 +23,39 @@ export default function DocumentsInPage() {
   const detectorRef = useRef<BarcodeDetector | null>(null);
   const [barcode, setBarcode] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const storageKey = "in-order";
+  const lastScanRef = useRef<{ code: string; time: number } | null>(null);
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
+    const handleDetection = (raw: string) => {
+      const code = raw.trim();
+      if (!code) return;
+      const now = Date.now();
+      if (
+        lastScanRef.current &&
+        lastScanRef.current.code === code &&
+        now - lastScanRef.current.time < 1000
+      ) {
+        return;
+      }
+      setBarcode(code);
+      const match = itemsRef.current.find((i) => i.code === code);
+      if (match) {
+        setScanError(null);
+        updateItem(code, 1);
+        lastScanRef.current = { code, time: now };
+        const target = itemRefs.current[code];
+        if (target) {
+          target.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        setTab("manual");
+      } else {
+        setScanError("Բարկոդը չի գտնվել ապրանքների ցանկում");
+        lastScanRef.current = { code, time: now };
+      }
+    };
+
     const startCamera = async () => {
       const hasDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
       if (hasDetector) {
@@ -37,12 +68,12 @@ export default function DocumentsInPage() {
             videoRef.current.srcObject = stream;
             await videoRef.current.play();
           }
-          await startScanDetector((code) => setBarcode(code.trim()));
+          await startScanDetector(handleDetection);
         } catch {
           setScanError("Բարկոդ ընթերցումը հասանելի չէ այս սարքում");
         }
       } else {
-        await startZxing((code) => setBarcode(code.trim()));
+        await startZxing(handleDetection);
       }
     };
 
@@ -123,7 +154,7 @@ export default function DocumentsInPage() {
     return stopCamera;
   }, [tab]);
 
-  const [items, setItems] = useState([
+const [items, setItems] = useState([
     {
       title: "Բժշկական սարքավորում",
       code: "IMP-2024-001",
@@ -159,7 +190,32 @@ export default function DocumentsInPage() {
       stock: 50,
       current: 0,
     },
+    {
+      title: "Գիրք (թեստ)",
+      code: "9785353004325",
+      location: "Test",
+      stock: 5,
+      current: 0,
+    },
   ]);
+  const itemsRef = useRef(items);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            setItems(parsed);
+            itemsRef.current = parsed;
+          }
+        } catch {
+          // ignore malformed storage
+        }
+      }
+    }
+  }, [storageKey]);
 
   const updateItem = (code: string, delta: number) => {
     setItems((prev) =>
@@ -175,6 +231,15 @@ export default function DocumentsInPage() {
         return { ...item, current: nextCurrent, stock: nextStock };
       })
     );
+  };
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const handleSave = () => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(storageKey, JSON.stringify(itemsRef.current));
   };
 
   return (
@@ -271,7 +336,13 @@ export default function DocumentsInPage() {
                 )}
                 <div className="space-y-0">
                   {items.map((item, idx) => (
-                    <div key={item.code} className="p-4 space-y-2 border-b border-border last:border-none">
+                    <div
+                      key={item.code}
+                      ref={(el) => {
+                        itemRefs.current[item.code] = el;
+                      }}
+                      className="p-4 space-y-2 border-b border-border last:border-none"
+                    >
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-sm font-semibold text-foreground">{item.title}</div>
                         <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
@@ -313,7 +384,10 @@ export default function DocumentsInPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-2">
-              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 h-12">
+              <button
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 h-12"
+                onClick={handleSave}
+              >
                 <ArrowDownToLineIcon className="mr-2 h-4 w-4" />
                 Պահպանել
               </button>
