@@ -3,32 +3,46 @@ name: Deploy Pages
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 18
+          cache: npm
+          # IMPORTANT: lockfile is inside frontend/
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Install dependencies
-        run: |
-          cd frontend
-          npm ci
+        working-directory: ./frontend
+        run: npm ci
+
       - name: Build (static export)
-        run: |
-          cd frontend
-          npm run build
+        working-directory: ./frontend
+        run: npm run build
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: frontend/out
+          # This is where Next/React/etc outputs the static files
+          path: ./frontend/out
 
   deploy:
     needs: build
@@ -40,5 +54,6 @@ jobs:
       pages: write
       id-token: write
     steps:
-      - id: deployment
+      - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
