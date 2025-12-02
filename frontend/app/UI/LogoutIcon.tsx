@@ -1,6 +1,7 @@
 import React from "react";
+import type { SVGProps } from "react";
 
-function LogoutIcon() {
+function LogoutIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -14,6 +15,7 @@ function LogoutIcon() {
       strokeLinejoin="round"
       className="lucide lucide-log-out h-4 w-4"
       aria-hidden="true"
+      {...props}
     >
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
       <polyline points="16 17 21 12 16 7"></polyline>
