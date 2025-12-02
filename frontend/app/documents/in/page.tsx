@@ -1,64 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { useRouter } from "next/navigation";
-import ChevronLeftIcon from "../../../UI/ChevronLeftIcon";
-import ChevronRightIcon from "../../../UI/ChevronRightIcon";
-import KeyIcon from "../../../UI/KeyIcon";
-import LogoutIcon from "../../../UI/LogoutIcon";
-import PlusIcon from "../../../UI/PlusIcon";
-import MinusIcon from "../../../UI/MinusIcon";
+import ArrowDownToLineIcon from "../../UI/ArrowDownToLineIcon";
+import CameraIcon from "../../UI/CameraIcon";
+import ChevronLeftIcon from "../../UI/ChevronLeftIcon";
+import KeyIcon from "../../UI/KeyIcon";
+import LogoutIcon from "../../UI/LogoutIcon";
+import MinusIcon from "../../UI/MinusIcon";
+import PlusIcon from "../../UI/PlusIcon";
+import ScanIcon from "../../UI/ScanIcon";
 
-import ArrowUpFromLineIcon from "../../../UI/ArrowUpFromLineIcon";
-import CameraIcon from "../../../UI/CameraIcon";
-import ScanIcon from "../../../UI/ScanIcon";
-import SaveIcon from "../../../UI/SaveIcon";
-import SendIcon from "../../../UI/SendIcon";
-
-const docs = [
-  {
-    id: "001234",
-    date: "15.05.2024",
-    title: "ՀՀ Առողջապահության նախարարություն",
-  },
-  {
-    id: "001235",
-    date: "16.05.2024",
-    title: "Արմենիա ՍՊԸ",
-  },
-  {
-    id: "001236",
-    date: "17.05.2024",
-    title: "Սիլ-Կո ՌՓԲԸ",
-  },
-];
-
-const baseItems = [
-  {
-    code: "MED-2024-003",
-    desc: "Վիրակապի նյութեր",
-    location: "C-15-03",
-    total: 3,
-    current: 0,
-    stock: 15,
-  },
-  {
-    code: "9785353004325",
-    desc: "Book barcode test",
-    location: "Test",
-    total: 1,
-    current: 0,
-    stock: 5,
-  },
-];
-
-export default function OutOrderDetail({ params }: { params: { id: string } }) {
+export default function DocumentsInPage() {
   const router = useRouter();
-  const doc = useMemo(() => docs.find((d) => d.id === params.id), [params.id]);
-  const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
-  const [items, setItems] = useState(baseItems);
-  const itemsRef = useRef(baseItems);
+  const [tab, setTab] = useState<"manual" | "camera" | "device">("device");
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const zxingRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -67,68 +23,8 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
   const detectorRef = useRef<BarcodeDetector | null>(null);
   const [barcode, setBarcode] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
-  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const lastScanRef = useRef<{ code: string; time: number } | null>(null);
-  const [highlighted, setHighlighted] = useState<string | null>(null);
-  const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const storageKey = useMemo(() => `out-order-${params.id}`, [params.id]);
-
-  const statusColorClass = (current: number, total: number) => {
-    if (current < total) return "text-muted-foreground";
-    if (current === total) return "text-[hsl(var(--success))]";
-    return "text-[hsl(var(--destructive))]";
-  };
 
   useEffect(() => {
-    // hydrate from localStorage if present
-    if (typeof window !== "undefined") {
-      const raw = window.localStorage.getItem(storageKey);
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            setItems(parsed);
-            itemsRef.current = parsed;
-          }
-        } catch {
-          // ignore malformed storage
-        }
-      }
-    }
-  }, [storageKey]);
-
-  useEffect(() => {
-    const handleDetection = (raw: string) => {
-      const code = raw.trim();
-      if (!code) return;
-      const now = Date.now();
-      if (
-        lastScanRef.current &&
-        lastScanRef.current.code === code &&
-        now - lastScanRef.current.time < 1000
-      ) {
-        return;
-      }
-
-      setBarcode(code);
-      const match = itemsRef.current.find((i) => i.code === code);
-      if (match) {
-        setScanError(null);
-        updateItem(code, 1);
-        setHighlighted(code);
-        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
-        highlightTimeoutRef.current = setTimeout(() => setHighlighted(null), 1200);
-        const target = itemRefs.current[code];
-        if (target) {
-          target.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-        setTab("manual"); // close camera after successful scan
-      } else {
-        setScanError("Բարկոդը չի գտնվել ապրանքների ցանկում");
-      }
-      lastScanRef.current = { code, time: now };
-    };
-
     const startCamera = async () => {
       const hasDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
       if (hasDetector) {
@@ -141,12 +37,12 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
             videoRef.current.srcObject = stream;
             await videoRef.current.play();
           }
-          await startScanDetector(handleDetection);
+          await startScanDetector((code) => setBarcode(code.trim()));
         } catch {
-          // ignore for now; could surface error toast if needed
+          setScanError("Բարկոդ ընթերցումը հասանելի չէ այս սարքում");
         }
       } else {
-        await startZxing(handleDetection);
+        await startZxing((code) => setBarcode(code.trim()));
       }
     };
 
@@ -174,9 +70,7 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
 
     const startScanDetector = async (onDetected: (code: string) => void) => {
       if (typeof window === "undefined") return;
-      if (!("BarcodeDetector" in window)) {
-        return;
-      }
+      if (!("BarcodeDetector" in window)) return;
       if (!detectorRef.current) {
         detectorRef.current = new BarcodeDetector({
           formats: ["code_128", "ean_13", "ean_8", "qr_code"],
@@ -203,7 +97,6 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      // ZXing reader cleanup
       zxingRef.current = null;
       if (zxingControlsRef.current?.stop) {
         zxingControlsRef.current.stop();
@@ -219,11 +112,6 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
       detectorRef.current = null;
       setBarcode(null);
       setScanError(null);
-      lastScanRef.current = null;
-      if (highlightTimeoutRef.current) {
-        clearTimeout(highlightTimeoutRef.current);
-        highlightTimeoutRef.current = null;
-      }
     };
 
     if (tab === "camera") {
@@ -235,9 +123,47 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
     return stopCamera;
   }, [tab]);
 
+  const [items, setItems] = useState([
+    {
+      title: "Բժշկական սարքավորում",
+      code: "IMP-2024-001",
+      location: "A-05-10",
+      stock: 12,
+      current: 0,
+    },
+    {
+      title: "Դեղորայքներ",
+      code: "IMP-2024-002",
+      location: "B-12-08",
+      stock: 34,
+      current: 0,
+    },
+    {
+      title: "Վիրակապի նյութեր",
+      code: "IMP-2024-003",
+      location: "C-18-15",
+      stock: 20,
+      current: 0,
+    },
+    {
+      title: "Լաբորատոր սարքավորում",
+      code: "IMP-2024-004",
+      location: "D-22-05",
+      stock: 7,
+      current: 0,
+    },
+    {
+      title: "Պաշտպանիչ միջոցներ",
+      code: "IMP-2024-005",
+      location: "E-10-20",
+      stock: 50,
+      current: 0,
+    },
+  ]);
+
   const updateItem = (code: string, delta: number) => {
-    setItems((prev) => {
-      const updated = prev.map((item) => {
+    setItems((prev) =>
+      prev.map((item) => {
         if (item.code !== code) return item;
         const increment = delta > 0 ? delta : 0;
         const decrement = delta < 0 ? Math.min(Math.abs(delta), item.current) : 0;
@@ -247,15 +173,8 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
             ? Math.max(0, item.stock + increment - decrement)
             : item.stock;
         return { ...item, current: nextCurrent, stock: nextStock };
-      });
-      itemsRef.current = updated;
-      return updated;
-    });
-  };
-
-  const handleSave = () => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(storageKey, JSON.stringify(itemsRef.current));
+      })
+    );
   };
 
   return (
@@ -265,14 +184,12 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => router.push("/documents/out")}
+                onClick={() => router.push("/documents")}
                 className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
               >
                 <ChevronLeftIcon className="h-5 w-5" />
               </button>
-              <h1 className="text-lg font-semibold text-foreground">
-                Պատվեր № {params.id}
-              </h1>
+              <h1 className="text-lg font-semibold text-foreground">Մուտքեր</h1>
             </div>
             <div className="flex items-center gap-2">
               <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0">
@@ -288,26 +205,8 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
         <main className="container mx-auto px-4 py-6 pb-20">
           <div className="space-y-4">
             <div className="rounded-xl border bg-card text-card-foreground shadow">
-              <div className="flex flex-col space-y-1.5 p-6 pb-3">
-                <div className="font-semibold tracking-tight text-base">
-                  Պատվերի տվյալներ
-                </div>
-              </div>
-              <div className="p-6 pt-0 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Ամսաթիվ:</span>
-                  <span className="font-medium">{doc?.date ?? "—"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Պատվիրատու:</span>
-                  <span className="font-medium">{doc?.title ?? "—"}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-card text-card-foreground shadow">
               <div className="p-6 pt-6">
-                <div dir="ltr" data-orientation="horizontal" className="w-full">
+                <div dir="ltr" className="w-full">
                   <div
                     role="tablist"
                     aria-orientation="horizontal"
@@ -353,9 +252,7 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
 
             <div className="rounded-xl border bg-card text-card-foreground shadow">
               <div className="flex flex-col space-y-1.5 p-6 pb-3">
-                <div className="font-semibold tracking-tight text-base">
-                  Ապրանքներ
-                </div>
+                <div className="font-semibold tracking-tight text-base">Ապրանքների ցանկ</div>
               </div>
               <div className="p-0 space-y-0">
                 {tab === "camera" && (
@@ -374,43 +271,24 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
                 )}
                 <div className="space-y-0">
                   {items.map((item, idx) => (
-                    <div
-                      key={item.code}
-                      ref={(el) => {
-                        itemRefs.current[item.code] = el;
-                      }}
-                      className={`p-4 space-y-3 border-b border-border last:border-none ${
-                        highlighted === item.code ? "bg-success-light/40" : ""
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-foreground">
-                            {item.desc}
-                          </div>
-                        </div>
+                    <div key={item.code} className="p-4 space-y-2 border-b border-border last:border-none">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-foreground">{item.title}</div>
                         <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
-                          {"stock" in item && typeof item.stock === "number" ? (
-                            <span>Պահեստում: {item.stock}</span>
-                          ) : null}
                           <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-muted text-muted-foreground border-border shrink-0">
-                            <span className={statusColorClass(item.current, item.total)}>
-                              {item.current}/{item.total}
+                            <span className="text-muted-foreground">
+                              {item.stock ?? 0}
                             </span>
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>Կոդ: {item.code}</span>
-                        {item.location ? (
-                          <>
-                            <span>•</span>
-                            <span>Հասցե: {item.location}</span>
-                          </>
-                        ) : null}
+                        <span>•</span>
+                        <span>Հասցե: {item.location}</span>
                       </div>
                       {tab === "manual" ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 pt-2">
                           <button
                             className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
                             onClick={() => updateItem(item.code, -1)}
@@ -418,13 +296,7 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
                             <MinusIcon className="h-4 w-4" />
                           </button>
                           <div className="flex-1 text-center">
-                            <span className={`text-lg font-semibold ${statusColorClass(item.current, item.total)}`}>
-                              {item.current}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              {" "}
-                              / {item.total}
-                            </span>
+                            <span className="text-lg font-semibold">{item.current}</span>
                           </div>
                           <button
                             className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
@@ -433,11 +305,7 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
                             <PlusIcon className="h-4 w-4" />
                           </button>
                         </div>
-                      ) : (
-                        <div className="flex items-center justify-center text-sm text-muted-foreground">
-                          {item.current} / {item.total}
-                        </div>
-                      )}
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -445,16 +313,12 @@ export default function OutOrderDetail({ params }: { params: { id: string } }) {
             </div>
 
             <div className="grid grid-cols-2 gap-3 pt-2">
-              <button
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 h-12"
-                onClick={handleSave}
-              >
-                <SaveIcon className="mr-2 h-4 w-4" />
+              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 h-12">
+                <ArrowDownToLineIcon className="mr-2 h-4 w-4" />
                 Պահպանել
               </button>
               <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2 h-12">
-                <SendIcon className="mr-2 h-4 w-4" />
-                Ուղարկել 1C
+                Ուղարկել
               </button>
             </div>
           </div>

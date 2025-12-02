@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import KeyIcon from "../UI/KeyIcon";
 import LogoutIcon from "../UI/LogoutIcon";
@@ -38,7 +37,10 @@ export default function DocumentsPage() {
 
         <main className="container mx-auto px-4 py-6 pb-20">
           <div className="grid gap-4">
-            <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 h-24 text-lg font-medium">
+            <button
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 h-24 text-lg font-medium"
+              onClick={() => router.push("/documents/in")}
+            >
               <ArrowDownToLineIcon className="mr-3 h-7 w-7" />
               Մուտքեր
             </button>
