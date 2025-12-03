@@ -249,7 +249,7 @@ const [items, setItems] = useState([
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => router.push("/documents")}
+                onClick={() => router.push("/")}
                 className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
               >
                 <ChevronLeftIcon className="h-5 w-5" />

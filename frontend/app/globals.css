@@ -12,15 +12,16 @@
   --card-foreground: 210 13% 23%;
   --popover: 0 0% 100%;
   --popover-foreground: 210 13% 23%;
-  --primary: 210 68% 48%;
+  /* --primary: 210 68% 48%; */
+  --primary: 156 100% 19%;
   --primary-foreground: 0 0% 100%;
-  --primary-hover: 210 68% 42%;
+  --primary-hover: 156 100% 25%;
   --secondary: 210 10% 95%;
   --secondary-foreground: 210 13% 23%;
   --muted: 210 15% 96%;
   --muted-foreground: 220 3% 44%;
-  --accent: 209 26% 90%;
-  --accent-foreground: 210 68% 42%;
+  --accent: 156 60% 92%;
+  --accent-foreground: 156 100% 25%;
   --success: 142 76% 36%;
   --success-foreground: 0 0% 100%;
   --success-light: 142 70% 94%;
@@ -32,7 +33,7 @@
   --destructive-light: 0 85% 97%;
   --border: 210 15% 88%;
   --input: 210 15% 88%;
-  --ring: 210 68% 48%;
+  --ring: 156 100% 25%;
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
