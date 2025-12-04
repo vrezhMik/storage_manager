@@ -40,7 +40,7 @@ export default function HomePage() {
           <div className="space-y-4">
             <div className="rounded-xl border bg-card text-card-foreground shadow p-6">
               <h2 className="text-xl font-semibold mb-4 text-foreground">
-                Բարի գալւստ <span className="text-[#cfb40b] text-4">FlexIt</span>
+                Բարի գալուստ <span className="text-[#cfb40b] text-4">Flexit</span> տերմինալ
               </h2>
               <p className="text-muted-foreground">Ընտրեք գործողություն</p>
             </div>
