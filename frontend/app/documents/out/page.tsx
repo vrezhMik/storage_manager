@@ -1,12 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import ArrowDownToLineIcon from "../../UI/ArrowDownToLineIcon";
-import ArrowUpFromLineIcon from "../../UI/ArrowUpFromLineIcon";
 import ChevronLeftIcon from "../../UI/ChevronLeftIcon";
-import ChevronRightIcon from "../../UI/ChevronRightIcon";
 import KeyIcon from "../../UI/KeyIcon";
 import LogoutIcon from "../../UI/LogoutIcon";
+import DocumentList from "../components/DocumentList";
 
 const docs = [
   {
@@ -58,36 +56,10 @@ export default function DocumentsOutPage() {
         </header>
 
         <main className="container mx-auto px-4 py-6 pb-20">
-          <div className="space-y-3">
-            {docs.map((doc) => (
-              <div
-                key={doc.id}
-                className="rounded-xl border bg-card text-card-foreground shadow cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => router.push(`/documents/out/${doc.id}`)}
-                role="button"
-                tabIndex={0}
-              >
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-baseline gap-3 mb-1">
-                        <h3 className="text-lg font-semibold text-foreground">
-                          № {doc.id}
-                        </h3>
-                        <span className="text-sm text-muted-foreground">
-                          {doc.date}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {doc.title}
-                      </p>
-                    </div>
-                    <ChevronRightIcon className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <DocumentList
+            documents={docs}
+            onSelect={(id) => router.push(`/documents/out/${id}`)}
+          />
         </main>
       </div>
       <section

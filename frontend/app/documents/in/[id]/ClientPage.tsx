@@ -3,10 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { useRouter } from "next/navigation";
-import ArrowUpFromLineIcon from "../../../UI/ArrowUpFromLineIcon";
 import CameraIcon from "../../../UI/CameraIcon";
 import ChevronLeftIcon from "../../../UI/ChevronLeftIcon";
-import ChevronRightIcon from "../../../UI/ChevronRightIcon";
 import KeyIcon from "../../../UI/KeyIcon";
 import LogoutIcon from "../../../UI/LogoutIcon";
 import MinusIcon from "../../../UI/MinusIcon";
@@ -15,51 +13,72 @@ import SaveIcon from "../../../UI/SaveIcon";
 import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
 
-const docs = [
-  {
-    id: "001234",
-    date: "15.05.2024",
-    title: "ՀՀ Առողջապահության նախարարություն",
-  },
-  {
-    id: "001235",
-    date: "16.05.2024",
-    title: "Արմենիա ՍՊԸ",
-  },
-  {
-    id: "001236",
-    date: "17.05.2024",
-    title: "Սիլ-Կո ՌՓԲԸ",
-  },
-];
-
 const baseItems = [
   {
-    code: "MED-2024-003",
-    desc: "Վիրակապի նյութեր",
-    location: "C-15-03",
-    total: 3,
+    code: "IMP-2024-001",
+    desc: "Բժշկական սարքավորում",
+    location: "A-05-10",
+    total: 10,
     current: 0,
-    stock: 15,
+    stock: 12,
+  },
+  {
+    code: "IMP-2024-002",
+    desc: "Դեղորայքներ",
+    location: "B-12-08",
+    total: 20,
+    current: 0,
+    stock: 34,
+  },
+  {
+    code: "IMP-2024-003",
+    desc: "Վիրակապի նյութեր",
+    location: "C-18-15",
+    total: 15,
+    current: 0,
+    stock: 20,
+  },
+  {
+    code: "IMP-2024-004",
+    desc: "Լաբորատոր սարքավորում",
+    location: "D-22-05",
+    total: 5,
+    current: 0,
+    stock: 7,
+  },
+  {
+    code: "IMP-2024-005",
+    desc: "Պաշտպանիչ միջոցներ",
+    location: "E-10-20",
+    total: 30,
+    current: 0,
+    stock: 50,
   },
   {
     code: "9785353004325",
-    desc: "Book barcode test",
+    desc: "Գիրք (թեստ)",
     location: "Test",
-    total: 1,
+    total: 5,
     current: 0,
     stock: 5,
   },
 ];
 
+const statusColorClass = (current: number, total: number) => {
+  if (current < total) return "text-muted-foreground";
+  if (current === total) return "text-[hsl(var(--success))]";
+  return "text-[hsl(var(--destructive))]";
+};
+
 type Props = { params: { id: string } };
 
-export default function OutOrderDetail({ params }: Props) {
+type Item = (typeof baseItems)[number];
+
+export default function InOrderDetail({ params }: Props) {
   const router = useRouter();
-  const doc = useMemo(() => docs.find((d) => d.id === params.id), [params.id]);
   const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
-  const [items, setItems] = useState(baseItems);
-  const itemsRef = useRef(baseItems);
+  const [items, setItems] = useState<Item[]>(baseItems);
+  const itemsRef = useRef<Item[]>(baseItems);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const zxingRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -72,16 +91,9 @@ export default function OutOrderDetail({ params }: Props) {
   const lastScanRef = useRef<{ code: string; time: number } | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const storageKey = useMemo(() => `out-order-${params.id}`, [params.id]);
-
-  const statusColorClass = (current: number, total: number) => {
-    if (current < total) return "text-muted-foreground";
-    if (current === total) return "text-[hsl(var(--success))]";
-    return "text-[hsl(var(--destructive))]";
-  };
+  const storageKey = useMemo(() => `in-order-${params.id}`, [params.id]);
 
   useEffect(() => {
-    // hydrate from localStorage if present
     if (typeof window !== "undefined") {
       const raw = window.localStorage.getItem(storageKey);
       if (raw) {
@@ -123,7 +135,7 @@ export default function OutOrderDetail({ params }: Props) {
         if (target) {
           target.scrollIntoView({ behavior: "smooth", block: "center" });
         }
-        setTab("manual"); // close camera after successful scan
+        setTab("manual");
       } else {
         setScanError("Բարկոդը չի գտնվել ապրանքների ցանկում");
       }
@@ -268,13 +280,13 @@ export default function OutOrderDetail({ params }: Props) {
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => router.push("/documents/out")}
+                onClick={() => router.push("/documents/in")}
                 className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
               >
                 <ChevronLeftIcon className="h-5 w-5" />
               </button>
               <h1 className="text-lg font-semibold text-foreground">
-                Պատվեր № {params.id}
+                Մուտք № {params.id}
               </h1>
             </div>
             <div className="flex items-center gap-2">
@@ -341,9 +353,7 @@ export default function OutOrderDetail({ params }: Props) {
 
             <div className="rounded-xl border bg-card text-card-foreground shadow">
               <div className="flex flex-col space-y-1.5 p-6 pb-3">
-                <div className="font-semibold tracking-tight text-base">
-                  Ապրանքներ
-                </div>
+                <div className="font-semibold tracking-tight text-base">Ապրանքներ</div>
               </div>
               <div className="p-0 space-y-0">
                 {tab === "camera" && (
@@ -378,7 +388,7 @@ export default function OutOrderDetail({ params }: Props) {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
-                         
+                        
                           <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-muted text-muted-foreground border-border shrink-0">
                             <span className={statusColorClass(item.current, item.total)}>
                               {item.current}/{item.total}
@@ -404,13 +414,15 @@ export default function OutOrderDetail({ params }: Props) {
                             <MinusIcon className="h-4 w-4" />
                           </button>
                           <div className="flex-1 text-center">
-                            <span className={`text-lg font-semibold ${statusColorClass(item.current, item.total)}`}>
+                            <span
+                              className={`text-lg font-semibold ${statusColorClass(
+                                item.current,
+                                item.total
+                              )}`}
+                            >
                               {item.current}
                             </span>
-                            <span className="text-sm text-muted-foreground">
-                              {" "}
-                              / {item.total}
-                            </span>
+                            <span className="text-sm text-muted-foreground"> / {item.total}</span>
                           </div>
                           <button
                             className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
@@ -438,9 +450,9 @@ export default function OutOrderDetail({ params }: Props) {
                 <SaveIcon className="mr-2 h-4 w-4" />
                 Պահպանել
               </button>
-              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-[#015433]/90 px-4 py-2 h-12">
+              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2 h-12">
                 <SendIcon className="mr-2 h-4 w-4" />
-                Ուղարկել 1C
+                Ուղարկել
               </button>
             </div>
           </div>
