@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "export": "NEXT_PUBLIC_BASE_PATH=storage_manager next build && rm -rf ../docs && cp -R out ../docs"
+    "export": "NEXT_PUBLIC_BASE_PATH=storage_manager next build && rm -rf ../docs && cp -R out ../docs && touch ../docs/.nojekyll"
   },
   "dependencies": {
     "@zxing/browser": "^0.1.5",
