@@ -14,6 +14,8 @@ import PlusIcon from "../../../UI/PlusIcon";
 import SaveIcon from "../../../UI/SaveIcon";
 import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
+import AuthGuard from "../../../components/AuthGuard";
+import { clearAuthStorage } from "../../../lib/auth";
 
 const docs = [
   {
@@ -73,6 +75,10 @@ export default function OutOrderDetail({ params }: Props) {
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const storageKey = useMemo(() => `out-order-${params.id}`, [params.id]);
+  const handleLogout = () => {
+    clearAuthStorage();
+    router.replace("/login");
+  };
 
   const statusColorClass = (current: number, total: number) => {
     if (current < total) return "text-muted-foreground";
@@ -262,34 +268,35 @@ export default function OutOrderDetail({ params }: Props) {
   };
 
   return (
-    <div className="App">
-      <div className="min-h-screen bg-background">
-        <header className="sticky top-0 z-50 w-full border-b border-border bg-card shadow-sm">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => router.push("/documents/out")}
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-              >
-                <ChevronLeftIcon className="h-5 w-5" />
-              </button>
-              <h1 className="text-lg font-semibold text-foreground">
-                Պատվեր № {params.id}
-              </h1>
+    <AuthGuard>
+      <div className="App">
+        <div className="min-h-screen bg-background">
+          <header className="sticky top-0 z-50 w-full border-b border-border bg-card shadow-sm">
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => router.push("/documents/out")}
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
+                >
+                  <ChevronLeftIcon className="h-5 w-5" />
+                </button>
+                <h1 className="text-lg font-semibold text-foreground">
+                  Պատվեր № {params.id}
+                </h1>
+              </div>
+              <div className="flex items-center gap-2">
+                <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0">
+                  <KeyIcon className="h-4 w-4" />
+                </button>
+                <button
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
+                  onClick={handleLogout}
+                >
+                  <LogoutIcon className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0">
-                <KeyIcon className="h-4 w-4" />
-              </button>
-              <button
-                className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-                onClick={() => router.push("/login")}
-              >
-                <LogoutIcon className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </header>
+          </header>
 
         <main className="container mx-auto px-4 py-6 pb-20">
           <div className="space-y-4">
@@ -454,5 +461,6 @@ export default function OutOrderDetail({ params }: Props) {
         aria-atomic="false"
       ></section>
     </div>
+    </AuthGuard>
   );
 }

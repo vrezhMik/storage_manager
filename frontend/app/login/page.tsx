@@ -1,6 +1,57 @@
 "use client";
 
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { isAuthenticated, storeAuthTokens, clearAuthStorage } from "../lib/auth";
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||
+  "http://127.0.0.1:8000/api";
+
 export default function LoginPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      router.replace("/");
+    }
+  }, [router]);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data?.message || "Չհաջողվեց մուտք գործել");
+        return;
+      }
+
+      clearAuthStorage();
+      storeAuthTokens(data);
+
+      router.push("/");
+    } catch (err) {
+      setError("Կապի սխալ, փորձեք կրկին");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="App">
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -34,20 +85,23 @@ export default function LoginPage() {
             </div>
           </div>
           <div className="p-6 pt-0">
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
                 <label
                   className="text-sm font-medium leading-none"
-                  htmlFor="username"
+                  htmlFor="email"
                 >
-                  Մուտքանուն
+                  Էլ. հասցե
                 </label>
                 <input
                   className="flex w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm h-11"
-                  id="username"
-                  placeholder="Մուտքագրեք մուտքանունը"
+                  id="email"
+                  placeholder="Մուտքագրեք էլ. հասցեն"
                   required
-                  type="text"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <div className="space-y-2">
@@ -63,13 +117,22 @@ export default function LoginPage() {
                   placeholder="Մուտքագրեք գաղտնաբառը"
                   required
                   type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
                 />
               </div>
+              {error && (
+                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                  {error}
+                </div>
+              )}
               <button
                 className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2 w-full h-11 text-base"
                 type="submit"
+                disabled={loading}
               >
-                Մուտք
+                {loading ? "Մուտք..." : "Մուտք"}
               </button>
             </form>
           </div>
