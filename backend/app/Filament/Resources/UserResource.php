@@ -42,6 +42,14 @@ class UserResource extends Resource
                 ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
                 ->dehydrated(fn ($state) => filled($state))
                 ->maxLength(255),
+            Forms\Components\Select::make('db_entry_id')
+                ->label('DB Config')
+                ->relationship('dbEntry', 'name')
+                ->searchable()
+                ->preload()
+                ->native(false)
+                ->helperText('Assign which remote DB/API config this user will use')
+                ->nullable(),
         ]);
     }
 
@@ -55,6 +63,10 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('email')
                     ->sortable()
                     ->searchable(),
+                Tables\Columns\TextColumn::make('dbEntry.name')
+                    ->label('DB Config')
+                    ->sortable()
+                    ->default('-'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

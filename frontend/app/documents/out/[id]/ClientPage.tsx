@@ -16,50 +16,37 @@ import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
 import AuthGuard from "../../../components/AuthGuard";
 import { clearAuthStorage } from "../../../lib/auth";
+import { OrderDoc } from "../page";
 
-const docs = [
-  {
-    id: "001234",
-    date: "15.05.2024",
-    title: "ՀՀ Առողջապահության նախարարություն",
-  },
-  {
-    id: "001235",
-    date: "16.05.2024",
-    title: "Արմենիա ՍՊԸ",
-  },
-  {
-    id: "001236",
-    date: "17.05.2024",
-    title: "Սիլ-Կո ՌՓԲԸ",
-  },
-];
-
-const baseItems = [
-  {
-    code: "MED-2024-003",
-    desc: "Վիրակապի նյութեր",
-    location: "C-15-03",
-    total: 3,
-    current: 0,
-    stock: 15,
-  },
-  {
-    code: "9785353004325",
-    desc: "Book barcode test",
-    location: "Test",
-    total: 1,
-    current: 0,
-    stock: 5,
-  },
-];
+const STORAGE_KEY = "orders-data";
 
 type Props = { params: { id: string } };
 
 export default function OutOrderDetail({ params }: Props) {
   const router = useRouter();
-  const doc = useMemo(() => docs.find((d) => d.id === params.id), [params.id]);
+  const doc = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed: OrderDoc[] = JSON.parse(raw);
+      return parsed.find((d) => d.id === params.id) ?? null;
+    } catch {
+      return null;
+    }
+  }, [params.id]);
   const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
+  const baseItems = useMemo(() => {
+    const mapped = doc?.items?.map((item) => ({
+      code: item?.Barcode || item?.ItemID || "-",
+      desc: item?.ItemID || "",
+      location: item?.ItemAddress || "",
+      total: Number(item?.Quantity) || 0,
+      current: 0,
+      stock: 0,
+    }));
+    return mapped && mapped.length > 0 ? mapped : [];
+  }, [doc]);
   const [items, setItems] = useState(baseItems);
   const itemsRef = useRef(baseItems);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -80,6 +67,31 @@ export default function OutOrderDetail({ params }: Props) {
     router.replace("/login");
   };
 
+  if (!doc) {
+    return (
+      <AuthGuard>
+        <div className="App">
+          <div className="min-h-screen bg-background flex items-center justify-center px-4">
+            <div className="max-w-md text-center space-y-4">
+              <h1 className="text-xl font-semibold text-foreground">
+                Փաստաթուղթը չի գտնվել
+              </h1>
+              <p className="text-muted-foreground text-sm">
+                Վերադարձեք Ելքերի ցուցակ և ընտրեք փաստաթուղթը նորից։
+              </p>
+              <button
+                onClick={() => router.push("/documents/out")}
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                Վերադառնալ
+              </button>
+            </div>
+          </div>
+        </div>
+      </AuthGuard>
+    );
+  }
+
   const statusColorClass = (current: number, total: number) => {
     if (current < total) return "text-muted-foreground";
     if (current === total) return "text-[hsl(var(--success))]";
@@ -96,13 +108,18 @@ export default function OutOrderDetail({ params }: Props) {
           if (Array.isArray(parsed)) {
             setItems(parsed);
             itemsRef.current = parsed;
+            return;
           }
         } catch {
           // ignore malformed storage
         }
       }
     }
-  }, [storageKey]);
+    if (baseItems.length > 0) {
+      setItems(baseItems);
+      itemsRef.current = baseItems;
+    }
+  }, [storageKey, baseItems]);
 
   useEffect(() => {
     const handleDetection = (raw: string) => {

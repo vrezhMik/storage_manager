@@ -1,33 +1,116 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ChevronLeftIcon from "../../UI/ChevronLeftIcon";
 import KeyIcon from "../../UI/KeyIcon";
 import LogoutIcon from "../../UI/LogoutIcon";
 import DocumentList from "../components/DocumentList";
 import AuthGuard from "../../components/AuthGuard";
-import { clearAuthStorage } from "../../lib/auth";
+import { clearAuthStorage, ACCESS_TOKEN_KEY } from "../../lib/auth";
 
-const docs = [
-  {
-    id: "001234",
-    date: "15.05.2024",
-    title: "ՀՀ Առողջապահության նախարարություն",
-  },
-  {
-    id: "001235",
-    date: "16.05.2024",
-    title: "Արմենիա ՍՊԸ",
-  },
-  {
-    id: "001236",
-    date: "17.05.2024",
-    title: "Սիլ-Կո ՌՓԲԸ",
-  },
-];
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||
+  "http://127.0.0.1:8000/api";
+
+export type OrderDoc = {
+  id: string;
+  date: string;
+  title: string;
+  items?: any[];
+};
+
+const STORAGE_KEY = "orders-data";
 
 export default function DocumentsOutPage() {
   const router = useRouter();
+  const [docs, setDocs] = useState<OrderDoc[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fetchedOnce = useRef(false);
+
+  useEffect(() => {
+    if (fetchedOnce.current) return;
+    fetchedOnce.current = true;
+
+    const cached = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          setDocs(parsed);
+        }
+      } catch {
+        // ignore bad cache
+      }
+    }
+
+    const fetchOrders = async () => {
+      setLoading(true);
+      setError(null);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+
+      try {
+        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+        if (!token) {
+          throw new Error("Missing auth token");
+        }
+
+        const res = await fetch(`${API_BASE}/orders`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const bodyText = await res.text().catch(() => "");
+          let message = `Request failed (${res.status})`;
+          try {
+            const body = JSON.parse(bodyText);
+            message = body?.message ?? message;
+          } catch {
+            // non-JSON error body
+            if (bodyText) message = bodyText;
+          }
+          throw new Error(message);
+        }
+
+        const text = await res.text();
+        const data = JSON.parse(text);
+        const mapped: OrderDoc[] = Array.isArray(data?.Documents)
+          ? data.Documents.map((doc: any) => ({
+              id: doc?.Number ?? "-",
+              date: (doc?.Date ?? "").split("T")[0] || "",
+              title: doc?.ClientName ?? "",
+              items: Array.isArray(doc?.Items) ? doc.Items : [],
+            }))
+          : [];
+
+        setDocs(mapped);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        } catch {
+        }
+      } catch (err: any) {
+        if (err?.name === "AbortError") {
+          setError("Սպասարկողը չի արձագանքում, փորձեք կրկին");
+        } else {
+          setError(err?.message ?? "Կապի սխալ, փորձեք կրկին");
+        }
+      } finally {
+        setLoading(false);
+        clearTimeout(timeout);
+      }
+    };
+
+    fetchOrders();
+    return () => {
+      // allow ongoing fetch; AbortController handles cancel
+    };
+  }, []);
+
   const handleLogout = () => {
     clearAuthStorage();
     router.replace("/login");
@@ -63,10 +146,20 @@ export default function DocumentsOutPage() {
           </header>
 
           <main className="container mx-auto px-4 py-6 pb-20">
+            {error && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            )}
             <DocumentList
               documents={docs}
               onSelect={(id) => router.push(`/documents/out/${id}`)}
             />
+            {loading && (
+              <div className="mt-4 text-sm text-muted-foreground">
+                Բեռնում...
+              </div>
+            )}
           </main>
         </div>
         <section

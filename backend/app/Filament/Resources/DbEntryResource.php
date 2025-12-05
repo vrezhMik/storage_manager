@@ -11,14 +11,13 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Support\Icons\Heroicon;
 use UnitEnum;
 
 class DbEntryResource extends Resource
 {
     protected static ?string $model = DbEntry::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::ServerStack;
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-server-stack';
 
     protected static string|UnitEnum|null $navigationGroup = 'DBs';
 
