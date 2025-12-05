@@ -14,57 +14,9 @@ import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
 import AuthGuard from "../../../components/AuthGuard";
 import { clearAuthStorage } from "../../../lib/auth";
+import { PurchaseDoc } from "../page";
 
-const baseItems = [
-  {
-    code: "IMP-2024-001",
-    desc: "Բժշկական սարքավորում",
-    location: "A-05-10",
-    total: 10,
-    current: 0,
-    stock: 12,
-  },
-  {
-    code: "IMP-2024-002",
-    desc: "Դեղորայքներ",
-    location: "B-12-08",
-    total: 20,
-    current: 0,
-    stock: 34,
-  },
-  {
-    code: "IMP-2024-003",
-    desc: "Վիրակապի նյութեր",
-    location: "C-18-15",
-    total: 15,
-    current: 0,
-    stock: 20,
-  },
-  {
-    code: "IMP-2024-004",
-    desc: "Լաբորատոր սարքավորում",
-    location: "D-22-05",
-    total: 5,
-    current: 0,
-    stock: 7,
-  },
-  {
-    code: "IMP-2024-005",
-    desc: "Պաշտպանիչ միջոցներ",
-    location: "E-10-20",
-    total: 30,
-    current: 0,
-    stock: 50,
-  },
-  {
-    code: "9785353004325",
-    desc: "Գիրք (թեստ)",
-    location: "Test",
-    total: 5,
-    current: 0,
-    stock: 5,
-  },
-];
+const STORAGE_KEY = "purchases-data";
 
 const statusColorClass = (current: number, total: number) => {
   if (current < total) return "text-muted-foreground";
@@ -74,10 +26,43 @@ const statusColorClass = (current: number, total: number) => {
 
 type Props = { params: { id: string } };
 
-type Item = (typeof baseItems)[number];
+type Item = {
+  code: string;
+  name: string;
+  itemId: string;
+  articul: string;
+  location: string;
+  total: number;
+  current: number;
+  stock: number;
+};
 
 export default function InOrderDetail({ params }: Props) {
   const router = useRouter();
+  const doc = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed: PurchaseDoc[] = JSON.parse(raw);
+      return parsed.find((d) => d.id === params.id) ?? null;
+    } catch {
+      return null;
+    }
+  }, [params.id]);
+  const baseItems = useMemo<Item[]>(() => {
+    const mapped = doc?.items?.map((item) => ({
+      code: item?.Barcode || item?.ItemID || "-",
+      name: item?.Name || item?.ItemID || "",
+      itemId: item?.ItemID || "",
+      articul: item?.Articul || "",
+      location: item?.ItemAddress || "",
+      total: Number(item?.Quantity) || 0,
+      current: 0,
+      stock: 0,
+    }));
+    return mapped && mapped.length > 0 ? mapped : [];
+  }, [doc]);
   const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
   const [items, setItems] = useState<Item[]>(baseItems);
   const itemsRef = useRef<Item[]>(baseItems);
@@ -99,6 +84,27 @@ export default function InOrderDetail({ params }: Props) {
     router.replace("/login");
   };
 
+  const mergeWithBase = (saved: Item[] | null | undefined): Item[] => {
+    if (!baseItems.length) return saved ?? [];
+    const lookup = new Map<string, Item>();
+    baseItems.forEach((i) => lookup.set(i.code || i.itemId, i));
+    if (saved && saved.length) {
+      return saved.map((s) => {
+        const key = s.code || s.itemId;
+        const base = key ? lookup.get(key) : undefined;
+        return {
+          ...s,
+          name: s.name || base?.name || "",
+          itemId: s.itemId || base?.itemId || "",
+          articul: s.articul || base?.articul || "",
+          location: s.location || base?.location || "",
+          total: base?.total ?? s.total ?? 0,
+        };
+      });
+    }
+    return baseItems;
+  };
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const raw = window.localStorage.getItem(storageKey);
@@ -106,15 +112,22 @@ export default function InOrderDetail({ params }: Props) {
         try {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            setItems(parsed);
-            itemsRef.current = parsed;
+            const merged = mergeWithBase(parsed);
+            setItems(merged);
+            itemsRef.current = merged;
+            return;
           }
         } catch {
           // ignore malformed storage
         }
       }
+      if (baseItems.length > 0) {
+        const merged = mergeWithBase(baseItems);
+        setItems(merged);
+        itemsRef.current = merged;
+      }
     }
-  }, [storageKey]);
+  }, [storageKey, baseItems]);
 
   useEffect(() => {
     const handleDetection = (raw: string) => {
@@ -391,7 +404,7 @@ export default function InOrderDetail({ params }: Props) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-foreground">
-                            {item.desc}
+                            {item.name || item.itemId || "Անվանում չկա"}
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
@@ -403,12 +416,20 @@ export default function InOrderDetail({ params }: Props) {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>Կոդ: {item.code}</span>
+                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span>Կոդ: {item.itemId || item.code}</span>
+                        <span>•</span>
+                        <span>Բարկոդ: {item.code || "—"}</span>
                         {item.location ? (
                           <>
                             <span>•</span>
                             <span>Հասցե: {item.location}</span>
+                          </>
+                        ) : null}
+                        {item.articul ? (
+                          <>
+                            <span>•</span>
+                            <span>Արտիկուլ: {item.articul}</span>
                           </>
                         ) : null}
                       </div>

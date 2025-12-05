@@ -11,6 +11,16 @@ class OrderController extends Controller
 {
     public function index(Request $request): Response
     {
+        return $this->proxy($request, 'orders');
+    }
+
+    public function purchases(Request $request): Response
+    {
+        return $this->proxy($request, 'purchases');
+    }
+
+    private function proxy(Request $request, string $type): Response
+    {
         $user = $request->user();
         $dbEntry = $user?->dbEntry;
 
@@ -20,16 +30,18 @@ class OrderController extends Controller
             ], Response::HTTP_BAD_REQUEST);
         }
 
+        $endpoint = $type === 'purchases' ? $dbEntry->api_get_purchase : $dbEntry->api_get_orders;
+
         $query = $request->query();
 
         $storedQuery = [];
-        $baseUrl = $dbEntry->api_get_orders;
+        $baseUrl = $endpoint;
 
-        $parts = parse_url($dbEntry->api_get_orders);
+        $parts = parse_url($endpoint);
         if ($parts !== false) {
             $baseUrl = ($parts['scheme'] ?? '')
                 ? ($parts['scheme'] . '://' . ($parts['host'] ?? '') . ($parts['port'] ?? '' ? ':' . $parts['port'] : '') . ($parts['path'] ?? ''))
-                : ($parts['path'] ?? $dbEntry->api_get_orders);
+                : ($parts['path'] ?? $endpoint);
 
             if (! empty($parts['query'])) {
                 parse_str($parts['query'], $storedQuery);
@@ -46,7 +58,7 @@ class OrderController extends Controller
 
         if ($response->failed()) {
             return response()->json([
-                'message' => 'Failed to fetch orders',
+                'message' => 'Failed to fetch '.$type,
                 'status' => $response->status(),
                 'body' => $response->json() ?? $response->body(),
             ], Response::HTTP_BAD_GATEWAY);

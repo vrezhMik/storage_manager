@@ -1,9 +1,12 @@
 import ClientPage from "./ClientPage";
-import { inDocs } from "../data";
 
 export function generateStaticParams() {
-  return inDocs.map((doc) => ({ id: doc.id }));
+  return [];
 }
+
+export const dynamicParams = true;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default function Page({ params }: { params: { id: string } }) {
   return <ClientPage params={params} />;

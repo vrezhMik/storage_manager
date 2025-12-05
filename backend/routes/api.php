@@ -12,3 +12,4 @@ Route::prefix('auth')->group(function () {
 });
 
 Route::middleware('auth.jwt')->get('orders', [OrderController::class, 'index']);
+Route::middleware('auth.jwt')->get('purchases', [OrderController::class, 'purchases']);

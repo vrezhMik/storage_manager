@@ -22,6 +22,17 @@ const STORAGE_KEY = "orders-data";
 
 type Props = { params: { id: string } };
 
+type Item = {
+  code: string;
+  name: string;
+  itemId: string;
+  articul: string;
+  location: string;
+  total: number;
+  current: number;
+  stock: number;
+};
+
 export default function OutOrderDetail({ params }: Props) {
   const router = useRouter();
   const doc = useMemo(() => {
@@ -36,10 +47,12 @@ export default function OutOrderDetail({ params }: Props) {
     }
   }, [params.id]);
   const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
-  const baseItems = useMemo(() => {
+  const baseItems = useMemo<Item[]>(() => {
     const mapped = doc?.items?.map((item) => ({
       code: item?.Barcode || item?.ItemID || "-",
-      desc: item?.ItemID || "",
+      name: item?.Name || item?.ItemID || "",
+      itemId: item?.ItemID || "",
+      articul: item?.Articul || "",
       location: item?.ItemAddress || "",
       total: Number(item?.Quantity) || 0,
       current: 0,
@@ -65,6 +78,27 @@ export default function OutOrderDetail({ params }: Props) {
   const handleLogout = () => {
     clearAuthStorage();
     router.replace("/login");
+  };
+
+  const mergeWithBase = (saved: Item[] | null | undefined): Item[] => {
+    if (!baseItems.length) return saved ?? [];
+    const lookup = new Map<string, Item>();
+    baseItems.forEach((i) => lookup.set(i.code || i.itemId, i));
+    if (saved && saved.length) {
+      return saved.map((s) => {
+        const key = s.code || s.itemId;
+        const base = key ? lookup.get(key) : undefined;
+        return {
+          ...s,
+          name: s.name || base?.name || "",
+          itemId: s.itemId || base?.itemId || "",
+          articul: s.articul || base?.articul || "",
+          location: s.location || base?.location || "",
+          total: base?.total ?? s.total ?? 0,
+        };
+      });
+    }
+    return baseItems;
   };
 
   if (!doc) {
@@ -106,8 +140,9 @@ export default function OutOrderDetail({ params }: Props) {
         try {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
-            setItems(parsed);
-            itemsRef.current = parsed;
+            const merged = mergeWithBase(parsed);
+            setItems(merged);
+            itemsRef.current = merged;
             return;
           }
         } catch {
@@ -116,8 +151,9 @@ export default function OutOrderDetail({ params }: Props) {
       }
     }
     if (baseItems.length > 0) {
-      setItems(baseItems);
-      itemsRef.current = baseItems;
+      const merged = mergeWithBase(baseItems);
+      setItems(merged);
+      itemsRef.current = merged;
     }
   }, [storageKey, baseItems]);
 
@@ -398,7 +434,7 @@ export default function OutOrderDetail({ params }: Props) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-semibold text-foreground">
-                            {item.desc}
+                            {item.name || item.itemId || "Անվանում չկա"}
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
@@ -410,12 +446,20 @@ export default function OutOrderDetail({ params }: Props) {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>Կոդ: {item.code}</span>
+                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span>Կոդ: {item.itemId || item.code}</span>
+                        <span>•</span>
+                        <span>Բարկոդ: {item.code || "—"}</span>
                         {item.location ? (
                           <>
                             <span>•</span>
                             <span>Հասցե: {item.location}</span>
+                          </>
+                        ) : null}
+                        {item.articul ? (
+                          <>
+                            <span>•</span>
+                            <span>Արտիկուլ: {item.articul}</span>
                           </>
                         ) : null}
                       </div>
