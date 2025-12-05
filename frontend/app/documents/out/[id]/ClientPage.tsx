@@ -75,6 +75,8 @@ export default function OutOrderDetail({ params }: Props) {
   const detectorRef = useRef<BarcodeDetector | null>(null);
   const [barcode, setBarcode] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [manualCode, setManualCode] = useState("");
+  const [manualError, setManualError] = useState<string | null>(null);
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const lastScanRef = useRef<{ code: string; time: number } | null>(null);
   const [highlighted, setHighlighted] = useState<string | null>(null);
@@ -90,6 +92,16 @@ export default function OutOrderDetail({ params }: Props) {
       setTab("camera");
     }
   }, [canManual, tab]);
+
+  const focusItem = (code: string) => {
+    const target = itemRefs.current[code];
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlighted(code);
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(() => setHighlighted(null), 1200);
+    }
+  };
 
   const mergeWithBase = (saved: Item[] | null | undefined): Item[] => {
     if (!baseItems.length) return saved ?? [];
@@ -370,7 +382,7 @@ export default function OutOrderDetail({ params }: Props) {
                   <div
                     role="tablist"
                     aria-orientation="horizontal"
-                    className={`h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full ${canManual ? "grid-cols-3" : "grid-cols-2"}`}
+                  className={`h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full ${canManual ? "grid-cols-3" : "grid-cols-2"}`}
                   >
                     {canManual && (
                       <button
@@ -390,11 +402,11 @@ export default function OutOrderDetail({ params }: Props) {
                       role="tab"
                       aria-selected={tab === "camera"}
                       data-state={tab === "camera" ? "active" : "inactive"}
-                      onClick={() => setTab("camera")}
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
-                    >
-                      <CameraIcon className="h-3.5 w-3.5 mr-1" />
-                      Տեսախցիկ
+                        onClick={() => setTab("camera")}
+                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
+                      >
+                        <CameraIcon className="h-3.5 w-3.5 mr-1" />
+                        Տեսախցիկ
                     </button>
                     <button
                       type="button"
@@ -404,12 +416,48 @@ export default function OutOrderDetail({ params }: Props) {
                       onClick={() => setTab("device")}
                       className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
                     >
-                      <ScanIcon className="h-3.5 w-3.5 mr-1" />
-                      Սարք
-                    </button>
+                        <ScanIcon className="h-3.5 w-3.5 mr-1" />
+                        Սարք
+                      </button>
+                    </div>
+                    <form
+                      className="mt-3 flex gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const code = manualCode.trim();
+                      if (!code) return;
+                      const match =
+                        itemsRef.current.find(
+                          (i) => i.code === code || i.itemId === code,
+                        ) || null;
+                      if (match) {
+                        setManualError(null);
+                        focusItem(match.code);
+                        updateItem(match.code, 1);
+                        if (canManual) setTab("manual");
+                      } else {
+                        setManualError("Բարկոդը չի գտնվել ցանկում");
+                      }
+                    }}
+                  >
+                      <input
+                        className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        placeholder="Մուտքագրեք բարկոդը"
+                        value={manualCode}
+                        onChange={(e) => setManualCode(e.target.value)}
+                      />
+                      <button
+                        type="submit"
+                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90"
+                      >
+                        Գտնել
+                      </button>
+                    </form>
+                    {manualError && (
+                      <p className="mt-2 text-xs text-red-600">{manualError}</p>
+                    )}
                   </div>
                 </div>
-              </div>
             </div>
 
             <div className="rounded-xl border bg-card text-card-foreground shadow">
