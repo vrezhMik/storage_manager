@@ -13,7 +13,7 @@ import SaveIcon from "../../../UI/SaveIcon";
 import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
 import AuthGuard from "../../../components/AuthGuard";
-import { clearAuthStorage } from "../../../lib/auth";
+import { clearAuthStorage, USER_MANUAL_ALLOWED_KEY } from "../../../lib/auth";
 import { PurchaseDoc } from "../page";
 
 const STORAGE_KEY = "purchases-data";
@@ -64,6 +64,11 @@ export default function InOrderDetail({ params }: Props) {
     return mapped && mapped.length > 0 ? mapped : [];
   }, [doc]);
   const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
+  const canManual = useMemo(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
+    return stored !== "false";
+  }, []);
   const [items, setItems] = useState<Item[]>(baseItems);
   const itemsRef = useRef<Item[]>(baseItems);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -83,6 +88,12 @@ export default function InOrderDetail({ params }: Props) {
     clearAuthStorage();
     router.replace("/login");
   };
+
+  useEffect(() => {
+    if (!canManual && tab === "manual") {
+      setTab("camera");
+    }
+  }, [canManual, tab]);
 
   const mergeWithBase = (saved: Item[] | null | undefined): Item[] => {
     if (!baseItems.length) return saved ?? [];
@@ -331,19 +342,21 @@ export default function InOrderDetail({ params }: Props) {
                   <div
                     role="tablist"
                     aria-orientation="horizontal"
-                    className="h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full grid-cols-3"
+                    className={`h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full ${canManual ? "grid-cols-3" : "grid-cols-2"}`}
                   >
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={tab === "manual"}
-                      data-state={tab === "manual" ? "active" : "inactive"}
-                      onClick={() => setTab("manual")}
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
-                    >
-                      <PlusIcon className="h-3.5 w-3.5 mr-1" />
-                      Ձեռքով
-                    </button>
+                    {canManual && (
+                      <button
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === "manual"}
+                        data-state={tab === "manual" ? "active" : "inactive"}
+                        onClick={() => setTab("manual")}
+                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
+                      >
+                        <PlusIcon className="h-3.5 w-3.5 mr-1" />
+                        Ձեռքով
+                      </button>
+                    )}
                     <button
                       type="button"
                       role="tab"
@@ -438,6 +451,7 @@ export default function InOrderDetail({ params }: Props) {
                           <button
                             className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
                             onClick={() => updateItem(item.code, -1)}
+                            disabled={!canManual}
                           >
                             <MinusIcon className="h-4 w-4" />
                           </button>
@@ -455,6 +469,7 @@ export default function InOrderDetail({ params }: Props) {
                           <button
                             className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
                             onClick={() => updateItem(item.code, 1)}
+                            disabled={!canManual}
                           >
                             <PlusIcon className="h-4 w-4" />
                           </button>

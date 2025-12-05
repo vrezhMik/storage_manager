@@ -7,7 +7,11 @@ import KeyIcon from "../../UI/KeyIcon";
 import LogoutIcon from "../../UI/LogoutIcon";
 import DocumentList from "../components/DocumentList";
 import AuthGuard from "../../components/AuthGuard";
-import { clearAuthStorage, ACCESS_TOKEN_KEY } from "../../lib/auth";
+import {
+  clearAuthStorage,
+  ACCESS_TOKEN_KEY,
+  USER_MANUAL_ALLOWED_KEY,
+} from "../../lib/auth";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||

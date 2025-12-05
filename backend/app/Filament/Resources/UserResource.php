@@ -42,6 +42,10 @@ class UserResource extends Resource
                 ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
                 ->dehydrated(fn ($state) => filled($state))
                 ->maxLength(255),
+            Forms\Components\Toggle::make('allow_manual_items')
+                ->label('Allow manual item input')
+                ->default(true)
+                ->helperText('If disabled, users can only use camera/device scanning'),
             Forms\Components\Select::make('db_entry_id')
                 ->label('DB Config')
                 ->relationship('dbEntry', 'name')
@@ -67,6 +71,9 @@ class UserResource extends Resource
                     ->label('DB Config')
                     ->sortable()
                     ->default('-'),
+                Tables\Columns\IconColumn::make('allow_manual_items')
+                    ->boolean()
+                    ->label('Manual input'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),

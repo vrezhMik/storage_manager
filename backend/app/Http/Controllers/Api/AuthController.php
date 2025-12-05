@@ -108,6 +108,7 @@ class AuthController extends Controller
                 'id' => $user->getKey(),
                 'name' => $user->name,
                 'email' => $user->email,
+                'allow_manual_items' => (bool) $user->allow_manual_items,
             ],
         ];
     }

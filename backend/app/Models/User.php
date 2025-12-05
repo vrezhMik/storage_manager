@@ -24,6 +24,7 @@ class User extends Authenticatable
         'email',
         'password',
         'db_entry_id',
+        'allow_manual_items',
     ];
 
     /**
