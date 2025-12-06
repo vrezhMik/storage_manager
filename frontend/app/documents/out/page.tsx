@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import ChevronLeftIcon from "../../UI/ChevronLeftIcon";
-import KeyIcon from "../../UI/KeyIcon";
-import LogoutIcon from "../../UI/LogoutIcon";
 import DocumentList from "../components/DocumentList";
 import AuthGuard from "../../components/AuthGuard";
-import { apiLogout, authFetch, USER_MANUAL_ALLOWED_KEY } from "../../lib/auth";
+import { authFetch, USER_MANUAL_ALLOWED_KEY } from "../../lib/auth";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||
@@ -25,13 +22,12 @@ const STORAGE_KEY = "orders-data";
 export default function DocumentsOutPage() {
   const router = useRouter();
   const [docs, setDocs] = useState<OrderDoc[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const fetchedOnce = useRef(false);
-
   useEffect(() => {
-    if (fetchedOnce.current) return;
-    fetchedOnce.current = true;
+    const controller = new AbortController();
+    let active = true;
+    let hadCache = false;
 
     const cached = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     if (cached) {
@@ -39,6 +35,8 @@ export default function DocumentsOutPage() {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) {
           setDocs(parsed);
+          hadCache = true;
+          setLoading(false);
         }
       } catch {
         // ignore bad cache
@@ -46,16 +44,14 @@ export default function DocumentsOutPage() {
     }
 
     const fetchOrders = async () => {
-      setLoading(true);
+      if (!hadCache) setLoading(true);
       setError(null);
-      const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
 
       try {
         const res = await authFetch(`${API_BASE}/orders`, {
           signal: controller.signal,
         });
-
         if (!res.ok) {
           const bodyText = await res.text().catch(() => "");
           let message = `Request failed (${res.status})`;
@@ -63,7 +59,6 @@ export default function DocumentsOutPage() {
             const body = JSON.parse(bodyText);
             message = body?.message ?? message;
           } catch {
-            // non-JSON error body
             if (bodyText) message = bodyText;
           }
           throw new Error(message);
@@ -79,81 +74,46 @@ export default function DocumentsOutPage() {
               items: Array.isArray(doc?.Items) ? doc.Items : [],
             }))
           : [];
-
-        setDocs(mapped);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
-          // also store manual flag if present on user (already stored at login)
-        } catch {
+        if (active) {
+          setDocs(mapped);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+          } catch {
+          }
         }
       } catch (err: any) {
-        if (err?.name === "AbortError") {
-          setError("Սպասարկողը չի արձագանքում, փորձեք կրկին");
-        } else {
-          setError(err?.message ?? "Կապի սխալ, փորձեք կրկին");
+        if (!active || controller.signal.aborted || err?.name === "AbortError") {
+          return;
         }
+        setError(err?.message ?? "Կապի սխալ, փորձեք կրկին");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
         clearTimeout(timeout);
       }
     };
 
     fetchOrders();
     return () => {
-      // allow ongoing fetch; AbortController handles cancel
+      active = false;
+      controller.abort();
     };
   }, []);
-
-  const handleLogout = () => {
-    apiLogout().finally(() => router.replace("/login"));
-  };
 
   return (
     <AuthGuard>
       <div className="App">
-        <div className="min-h-screen bg-background">
-          <header className="sticky top-0 z-50 w-full border-b border-border bg-card shadow-sm">
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => router.push("/")}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-                >
-                  <ChevronLeftIcon className="h-5 w-5" />
-                </button>
-                <h1 className="text-lg font-semibold text-foreground">Ելքեր</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0">
-                  <KeyIcon className="h-4 w-4" />
-                </button>
-                <button
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-                  onClick={handleLogout}
-                >
-                  <LogoutIcon className="h-4 w-4" />
-                </button>
-              </div>
+        <main className="container mx-auto px-4 py-6 pb-20">
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
             </div>
-          </header>
-
-          <main className="container mx-auto px-4 py-6 pb-20">
-            {error && (
-              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
-              </div>
-            )}
-            <DocumentList
-              documents={docs}
-              onSelect={(id) => router.push(`/documents/out/${id}`)}
-            />
-            {loading && (
-              <div className="mt-4 text-sm text-muted-foreground">
-                Բեռնում...
-              </div>
-            )}
-          </main>
-        </div>
+          )}
+          <DocumentList
+            documents={docs}
+            loading={loading}
+            onSelect={(id) => router.push(`/documents/out/${id}`)}
+          />
+        </main>
         <section
           aria-label="Notifications alt+T"
           tabIndex={-1}

@@ -5,17 +5,13 @@ import { BrowserMultiFormatReader } from "@zxing/browser";
 import { useRouter } from "next/navigation";
 import ArrowUpFromLineIcon from "../../../UI/ArrowUpFromLineIcon";
 import CameraIcon from "../../../UI/CameraIcon";
-import ChevronLeftIcon from "../../../UI/ChevronLeftIcon";
-import ChevronRightIcon from "../../../UI/ChevronRightIcon";
-import KeyIcon from "../../../UI/KeyIcon";
-import LogoutIcon from "../../../UI/LogoutIcon";
 import MinusIcon from "../../../UI/MinusIcon";
 import PlusIcon from "../../../UI/PlusIcon";
 import SaveIcon from "../../../UI/SaveIcon";
 import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
 import AuthGuard from "../../../components/AuthGuard";
-import { apiLogout, USER_MANUAL_ALLOWED_KEY } from "../../../lib/auth";
+import { USER_MANUAL_ALLOWED_KEY } from "../../../lib/auth";
 import { OrderDoc } from "../page";
 
 const STORAGE_KEY = "orders-data";
@@ -370,34 +366,6 @@ export default function OutOrderDetail({ params }: Props) {
   return (
     <AuthGuard>
       <div className="App">
-        <div className="min-h-screen bg-background">
-          <header className="sticky top-0 z-50 w-full border-b border-border bg-card shadow-sm">
-            <div className="flex items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => router.push("/documents/out")}
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-                >
-                  <ChevronLeftIcon className="h-5 w-5" />
-                </button>
-                <h1 className="text-lg font-semibold text-foreground">
-                  Պատվեր № {params.id}
-                </h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0">
-                  <KeyIcon className="h-4 w-4" />
-                </button>
-                <button
-                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-                  onClick={handleLogout}
-                >
-                  <LogoutIcon className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </header>
-
         <main className="container mx-auto px-4 py-6 pb-20">
           <div className="space-y-4">
             <div className="rounded-xl border bg-card text-card-foreground shadow">
@@ -636,7 +604,6 @@ export default function OutOrderDetail({ params }: Props) {
         aria-relevant="additions text"
         aria-atomic="false"
       ></section>
-    </div>
     </AuthGuard>
   );
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import TopBar from "./components/TopBar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -13,7 +14,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <body className={inter.className}>
-        <main>{children}</main>
+        <div className="min-h-screen bg-background">
+          <TopBar />
+          <main>{children}</main>
+        </div>
       </body>
     </html>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { storeAuthTokens, clearAuthStorage, authFetch } from "../lib/auth";
 
@@ -15,14 +15,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    authFetch(`${API_BASE}/auth/me`)
-      .then((res) => {
-        if (res.ok) router.replace("/");
-      })
-      .catch(() => {});
-  }, [router]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -103,6 +95,7 @@ export default function LoginPage() {
                   placeholder="Մուտքագրեք էլ. հասցեն"
                   required
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loading}
@@ -122,6 +115,7 @@ export default function LoginPage() {
                     placeholder="Մուտքագրեք գաղտնաբառը"
                     required
                     type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={loading}

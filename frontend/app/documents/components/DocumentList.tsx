@@ -11,11 +11,36 @@ type Document = {
 type Props = {
   documents: Document[];
   onSelect: (id: string) => void;
+  loading?: boolean;
+  skeletonCount?: number;
 };
 
-export default function DocumentList({ documents, onSelect }: Props) {
+export default function DocumentList({
+  documents,
+  onSelect,
+  loading = false,
+  skeletonCount = 3,
+}: Props) {
   return (
     <div className="space-y-3">
+      {loading &&
+        Array.from({ length: skeletonCount }).map((_, idx) => (
+          <div
+            key={`skeleton-${idx}`}
+            className="rounded-xl border bg-muted/60 text-card-foreground shadow animate-pulse backdrop-blur-sm"
+          >
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 space-y-2">
+                  <div className="h-5 w-32 rounded bg-muted-foreground/20" />
+                  <div className="h-4 w-20 rounded bg-muted-foreground/20" />
+                </div>
+                <div className="h-5 w-5 rounded-full bg-muted-foreground/20" />
+              </div>
+              <div className="h-4 w-3/4 rounded bg-muted-foreground/15" />
+            </div>
+          </div>
+        ))}
       {documents.map((doc) => (
         <div
           key={doc.id}
