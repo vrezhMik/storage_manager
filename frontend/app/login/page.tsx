@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isAuthenticated, storeAuthTokens, clearAuthStorage } from "../lib/auth";
+import { storeAuthTokens, clearAuthStorage, authFetch } from "../lib/auth";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||
@@ -17,9 +17,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated()) {
-      router.replace("/");
-    }
+    authFetch(`${API_BASE}/auth/me`)
+      .then((res) => {
+        if (res.ok) router.replace("/");
+      })
+      .catch(() => {});
   }, [router]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -33,6 +35,7 @@ export default function LoginPage() {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 

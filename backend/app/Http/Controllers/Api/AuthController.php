@@ -11,6 +11,7 @@ use Firebase\JWT\Key;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -29,16 +30,21 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
         }
 
-        return response()->json($this->issueTokens($user));
+        return $this->respondWithTokens($this->issueTokens($user));
     }
 
     public function refresh(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'refresh_token' => ['required', 'string'],
+            'refresh_token' => ['nullable', 'string'],
         ]);
 
-        $hashed = $this->hashRefreshToken($data['refresh_token']);
+        $provided = $data['refresh_token'] ?? $request->cookie('refresh_token');
+        if (! $provided) {
+            return response()->json(['message' => 'Invalid refresh token'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $hashed = $this->hashRefreshToken($provided);
 
         /** @var RefreshToken|null $record */
         $record = RefreshToken::where('token_hash', $hashed)->first();
@@ -55,7 +61,7 @@ class AuthController extends Controller
 
         $record->update(['revoked_at' => now()]);
 
-        return response()->json($this->issueTokens($user));
+        return $this->respondWithTokens($this->issueTokens($user));
     }
 
     public function logout(Request $request): JsonResponse
@@ -64,12 +70,17 @@ class AuthController extends Controller
             'refresh_token' => ['nullable', 'string'],
         ]);
 
-        if (! empty($data['refresh_token'])) {
-            RefreshToken::where('token_hash', $this->hashRefreshToken($data['refresh_token']))
+        $refreshToken = $data['refresh_token'] ?? $request->cookie('refresh_token');
+
+        if (! empty($refreshToken)) {
+            RefreshToken::where('token_hash', $this->hashRefreshToken($refreshToken))
                 ->update(['revoked_at' => now()]);
         }
 
-        return response()->json(['message' => 'Logged out']);
+        return response()
+            ->json(['message' => 'Logged out'])
+            ->withoutCookie('access_token')
+            ->withoutCookie('refresh_token');
     }
 
     public function me(Request $request): JsonResponse
@@ -110,6 +121,52 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'allow_manual_items' => (bool) $user->allow_manual_items,
             ],
+        ];
+    }
+
+    private function respondWithTokens(array $tokens): JsonResponse
+    {
+        $cookies = $this->buildCookies($tokens);
+        $response = response()->json($tokens);
+        foreach ($cookies as $cookie) {
+            $response->headers->setCookie($cookie);
+        }
+
+        return $response;
+    }
+
+    private function buildCookies(array $tokens): array
+    {
+        $secure = (bool) config('session.secure', false);
+        $sameSite = config('session.same_site', 'lax');
+
+        $accessMinutes = ($tokens['expires_in'] ?? 900) / 60;
+        $refreshExpiry = $tokens['refresh_expires_at'] ?? null;
+        $refreshMinutes = $refreshExpiry ? now()->diffInMinutes($refreshExpiry) : (int) env('JWT_REFRESH_TTL_DAYS', 30) * 1440;
+
+        return [
+            Cookie::make(
+                'access_token',
+                $tokens['access_token'],
+                (int) ceil($accessMinutes),
+                '/',
+                null,
+                $secure,
+                true,
+                false,
+                $sameSite
+            ),
+            Cookie::make(
+                'refresh_token',
+                $tokens['refresh_token'],
+                (int) ceil($refreshMinutes),
+                '/',
+                null,
+                $secure,
+                true,
+                false,
+                $sameSite
+            ),
         ];
     }
 

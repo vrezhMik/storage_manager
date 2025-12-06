@@ -7,11 +7,7 @@ import KeyIcon from "../../UI/KeyIcon";
 import LogoutIcon from "../../UI/LogoutIcon";
 import DocumentList from "../components/DocumentList";
 import AuthGuard from "../../components/AuthGuard";
-import {
-  clearAuthStorage,
-  ACCESS_TOKEN_KEY,
-  USER_MANUAL_ALLOWED_KEY,
-} from "../../lib/auth";
+import { apiLogout, authFetch, USER_MANUAL_ALLOWED_KEY } from "../../lib/auth";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||
@@ -56,15 +52,7 @@ export default function DocumentsInPage() {
       const timeout = setTimeout(() => controller.abort(), 15000);
 
       try {
-        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
-        if (!token) {
-          throw new Error("Missing auth token");
-        }
-
-        const res = await fetch(`${API_BASE}/purchases`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const res = await authFetch(`${API_BASE}/purchases`, {
           signal: controller.signal,
         });
 
@@ -112,8 +100,7 @@ export default function DocumentsInPage() {
   }, []);
 
   const handleLogout = () => {
-    clearAuthStorage();
-    router.replace("/login");
+    apiLogout().finally(() => router.replace("/login"));
   };
 
   return (

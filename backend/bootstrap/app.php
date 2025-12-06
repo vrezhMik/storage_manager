@@ -16,7 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.jwt' => \App\Http\Middleware\AuthenticateJwt::class,
         ]);
 
-        $middleware->append(\App\Http\Middleware\Cors::class);
+        // Use our custom CORS middleware instead of the default handler.
+        $middleware->replace(
+            \Illuminate\Http\Middleware\HandleCors::class,
+            \App\Http\Middleware\Cors::class
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

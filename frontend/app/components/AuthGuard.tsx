@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { clearAuthStorage, isAuthenticated } from "../lib/auth";
+import { clearAuthStorage, authFetch, API_BASE } from "../lib/auth";
 
 type Props = {
   children: ReactNode;
@@ -13,13 +13,27 @@ export default function AuthGuard({ children }: Props) {
   const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
-    const authed = isAuthenticated();
-    if (!authed) {
-      clearAuthStorage();
-      router.replace("/login");
-      return;
-    }
-    setAllowed(true);
+    let active = true;
+    const ensure = async () => {
+      try {
+        const res = await authFetch(`${API_BASE}/auth/me`);
+        if (!active) return;
+        if (!res.ok) {
+          clearAuthStorage();
+          router.replace("/login");
+          return;
+        }
+        setAllowed(true);
+      } catch {
+        if (!active) return;
+        clearAuthStorage();
+        router.replace("/login");
+      }
+    };
+    ensure();
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   if (!allowed) return null;

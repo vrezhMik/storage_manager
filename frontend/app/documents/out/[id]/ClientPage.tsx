@@ -15,7 +15,7 @@ import SaveIcon from "../../../UI/SaveIcon";
 import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
 import AuthGuard from "../../../components/AuthGuard";
-import { clearAuthStorage, USER_MANUAL_ALLOWED_KEY } from "../../../lib/auth";
+import { apiLogout, USER_MANUAL_ALLOWED_KEY } from "../../../lib/auth";
 import { OrderDoc } from "../page";
 
 const STORAGE_KEY = "orders-data";
@@ -83,8 +83,7 @@ export default function OutOrderDetail({ params }: Props) {
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const storageKey = useMemo(() => `out-order-${params.id}`, [params.id]);
   const handleLogout = () => {
-    clearAuthStorage();
-    router.replace("/login");
+    apiLogout().finally(() => router.replace("/login"));
   };
 
   useEffect(() => {

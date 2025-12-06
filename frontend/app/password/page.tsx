@@ -5,13 +5,12 @@ import ChevronLeftIcon from "../UI/ChevronLeftIcon";
 import KeyIcon from "../UI/KeyIcon";
 import LogoutIcon from "../UI/LogoutIcon";
 import AuthGuard from "../components/AuthGuard";
-import { clearAuthStorage } from "../lib/auth";
+import { apiLogout } from "../lib/auth";
 
 export default function PasswordPage() {
   const router = useRouter();
   const handleLogout = () => {
-    clearAuthStorage();
-    router.replace("/login");
+    apiLogout().finally(() => router.replace("/login"));
   };
 
   return (

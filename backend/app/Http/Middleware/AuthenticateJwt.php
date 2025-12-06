@@ -15,12 +15,17 @@ class AuthenticateJwt
     public function handle(Request $request, Closure $next): Response
     {
         $authorization = $request->header('Authorization');
+        $token = null;
 
-        if (! $authorization || ! str_starts_with($authorization, 'Bearer ')) {
-            return $this->unauthorized();
+        if ($authorization && str_starts_with($authorization, 'Bearer ')) {
+            $token = substr($authorization, 7);
+        } elseif ($request->cookies->has('access_token')) {
+            $token = $request->cookies->get('access_token');
         }
 
-        $token = substr($authorization, 7);
+        if (! $token) {
+            return $this->unauthorized();
+        }
         $secret = config('app.jwt_secret') ?? env('JWT_SECRET');
 
         if (! $secret) {

@@ -7,14 +7,13 @@ import LogoutIcon from "./UI/LogoutIcon";
 import ArrowDownToLineIcon from "./UI/ArrowDownToLineIcon";
 import ArrowUpFromLineIcon from "./UI/ArrowUpFromLineIcon";
 import AuthGuard from "./components/AuthGuard";
-import { clearAuthStorage } from "./lib/auth";
+import { apiLogout } from "./lib/auth";
 
 export default function HomePage() {
   const router = useRouter();
 
   const handleLogout = () => {
-    clearAuthStorage();
-    router.replace("/login");
+    apiLogout().finally(() => router.replace("/login"));
   };
 
   return (
