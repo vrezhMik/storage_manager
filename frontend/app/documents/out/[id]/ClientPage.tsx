@@ -46,12 +46,16 @@ export default function OutOrderDetail({ params }: Props) {
       return null;
     }
   }, [params.id]);
-  const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
   const canManual = useMemo(() => {
     if (typeof window === "undefined") return true;
     const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
     return stored !== "false";
   }, []);
+  const [tab, setTab] = useState<"manual" | "camera" | "device">(() => {
+    if (typeof window === "undefined") return "manual";
+    const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
+    return stored === "false" ? "device" : "manual";
+  });
   const baseItems = useMemo<Item[]>(() => {
     const mapped = doc?.items?.map((item) => ({
       code: item?.Barcode || item?.ItemID || "-",
@@ -79,17 +83,19 @@ export default function OutOrderDetail({ params }: Props) {
   const [manualError, setManualError] = useState<string | null>(null);
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const lastScanRef = useRef<{ code: string; time: number } | null>(null);
+  const handledScanRef = useRef(false);
+  const stopCameraRef = useRef<() => void>(() => {});
+  const [cameraActive, setCameraActive] = useState(false);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const storageKey = useMemo(() => `out-order-${params.id}`, [params.id]);
+  const hasBarcode = Boolean(barcode);
   const handleLogout = () => {
     apiLogout().finally(() => router.replace("/login"));
   };
 
   useEffect(() => {
-    if (!canManual && tab === "manual") {
-      setTab("camera");
-    }
+    if (!canManual && tab === "manual") setTab("device");
   }, [canManual, tab]);
 
   const focusItem = (code: string) => {
@@ -181,6 +187,7 @@ export default function OutOrderDetail({ params }: Props) {
 
   useEffect(() => {
     const handleDetection = (raw: string) => {
+      if (handledScanRef.current) return;
       const code = raw.trim();
       if (!code) return;
       const now = Date.now();
@@ -204,7 +211,11 @@ export default function OutOrderDetail({ params }: Props) {
         if (target) {
           target.scrollIntoView({ behavior: "smooth", block: "center" });
         }
-        setTab("manual"); // close camera after successful scan
+        handledScanRef.current = true;
+        setTimeout(() => {
+          stopCameraRef.current();
+          setCameraActive(false);
+        }, 250);
       } else {
         setScanError("Բարկոդը չի գտնվել ապրանքների ցանկում");
       }
@@ -212,23 +223,34 @@ export default function OutOrderDetail({ params }: Props) {
     };
 
     const startCamera = async () => {
+      if (streamRef.current) return;
       const hasDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
-      if (hasDetector) {
+
+      const requestStream = async () => {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
+          return await navigator.mediaDevices.getUserMedia({
             video: { facingMode: { ideal: "environment" } },
           });
-          streamRef.current = stream;
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            await videoRef.current.play();
-          }
-          await startScanDetector(handleDetection);
         } catch {
-          setScanError("Բարկոդ ընթերցումը հասանելի չէ այս սարքում");
+          return await navigator.mediaDevices.getUserMedia({ video: true });
         }
-      } else {
-        await startZxing(handleDetection);
+      };
+
+      try {
+        const stream = await requestStream();
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+        if (hasDetector) {
+          await startScanDetector(handleDetection);
+        } else {
+          await startZxing(handleDetection);
+        }
+      } catch (err) {
+        console.error("Camera start failed", err);
+        setScanError("Տեսախցիկը չի միանում․ թույլատրեք հասանելիությունը և փորձեք կրկին");
       }
     };
 
@@ -249,7 +271,8 @@ export default function OutOrderDetail({ params }: Props) {
           }
         );
         zxingControlsRef.current = controls as unknown as { stop?: () => void };
-      } catch {
+      } catch (err) {
+        console.error("Camera start failed", err);
         setScanError("Բարկոդ ընթերցումը հասանելի չէ այս սարքում");
       }
     };
@@ -300,20 +323,22 @@ export default function OutOrderDetail({ params }: Props) {
       setBarcode(null);
       setScanError(null);
       lastScanRef.current = null;
+      handledScanRef.current = false;
       if (highlightTimeoutRef.current) {
         clearTimeout(highlightTimeoutRef.current);
         highlightTimeoutRef.current = null;
       }
     };
+    stopCameraRef.current = stopCamera;
 
-    if (tab === "camera") {
+    if (tab === "camera" && cameraActive) {
       startCamera();
     } else {
       stopCamera();
     }
 
     return stopCamera;
-  }, [tab]);
+  }, [tab, cameraActive]);
 
   const updateItem = (code: string, delta: number) => {
     setItems((prev) => {
@@ -467,15 +492,43 @@ export default function OutOrderDetail({ params }: Props) {
               </div>
               <div className="p-0 space-y-0">
                 {tab === "camera" && (
-                  <div className="border-b border-border bg-black/60 text-white">
-                    <video
-                      ref={videoRef}
-                      className="w-full rounded-b-xl"
-                      playsInline
-                      muted
-                    />
+                  <div className="relative border-b border-border bg-black/60 text-white">
+                    <div className="flex items-center justify-center gap-2 px-4 py-3 bg-black/70">
+                      <button
+                        type="button"
+                        onClick={() => setCameraActive((v) => !v)}
+                        className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-black shadow transition hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-yellow-400"
+                      >
+                        <CameraIcon className="h-4 w-4" />
+                        {cameraActive ? "Անջատել" : "Միացնել տեսախցիկը"}
+                      </button>
+                    </div>
+                    {cameraActive ? (
+                      <>
+                        <video
+                          ref={videoRef}
+                          className="w-full rounded-b-xl aspect-video object-cover bg-black"
+                          playsInline
+                          autoPlay
+                          muted
+                        />
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                          <div
+                            className={`h-40 w-64 rounded-md border-2 transition-colors duration-150 ${
+                              hasBarcode
+                                ? "border-green-400 shadow-[0_0_0_2px_rgba(34,197,94,0.35)]"
+                                : "border-yellow-400 shadow-[0_0_0_2px_rgba(250,204,21,0.35)]"
+                            }`}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full rounded-b-xl bg-black/80 aspect-video flex items-center justify-center text-xs text-white/70">
+                        Սկսեք սկանավորումը
+                      </div>
+                    )}
                     <div className="px-4 py-2 text-xs text-white/80 flex justify-between">
-                      <span>{barcode ? `Գտնված բարկոդը: ${barcode}` : "Սկանավորում..."}</span>
+                      <span>{barcode ? `Գտնված բարկոդը: ${barcode}` : cameraActive ? "Սկանավորում..." : "Տեսախցիկը անջատված է"}</span>
                       {scanError && <span className="text-red-400">{scanError}</span>}
                     </div>
                   </div>
