@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { clearAuthStorage, authFetch, API_BASE } from "../lib/auth";
 
 let hasCheckedOnce = false;
-let lastAllowed = false;
+let lastAllowed = true;
 
 type Props = {
   children: ReactNode;
@@ -13,7 +13,7 @@ type Props = {
 
 export default function AuthGuard({ children }: Props) {
   const router = useRouter();
-  const [allowed, setAllowed] = useState(() => (hasCheckedOnce ? lastAllowed : false));
+  const [allowed, setAllowed] = useState(() => (hasCheckedOnce ? lastAllowed : true));
 
   useEffect(() => {
     if (hasCheckedOnce) {
@@ -50,7 +50,6 @@ export default function AuthGuard({ children }: Props) {
     ensure();
     return () => {
       active = false;
-      controller.abort();
     };
   }, [router]);
 
