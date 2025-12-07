@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { useRouter } from "next/navigation";
 import ArrowUpFromLineIcon from "../../../UI/ArrowUpFromLineIcon";
@@ -16,7 +16,7 @@ import { OrderDoc } from "../page";
 
 const STORAGE_KEY = "orders-data";
 
-type Props = { params: { id: string } };
+type Props = { id?: string };
 
 type Item = {
   code: string;
@@ -45,7 +45,7 @@ const formatTransactionDate = (value?: string | null) => {
   return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
 };
 
-export default function OutOrderDetail({ params }: Props) {
+export default function OutOrderDetail({ id }: Props) {
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
   const [doc, setDoc] = useState<OrderDoc | null | undefined>(undefined);
@@ -58,12 +58,13 @@ export default function OutOrderDetail({ params }: Props) {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed: OrderDoc[] = JSON.parse(raw);
-      const found = parsed.find((d) => d.id === params.id) ?? null;
+      const targetId = id ?? parsed[0]?.id;
+      const found = parsed.find((d) => d.id === targetId) ?? null;
       setDoc(found);
     } catch {
       setDoc(null);
     }
-  }, [params.id]);
+  }, [id]);
   const canManual = useMemo(() => {
     if (typeof window === "undefined") return true;
     const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
@@ -112,7 +113,7 @@ export default function OutOrderDetail({ params }: Props) {
   const deviceBufferRef = useRef<string>("");
   const deviceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const deviceIdleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const storageKey = useMemo(() => `out-order-${params.id}`, [params.id]);
+  const storageKey = useMemo(() => `out-order-${id ?? "default"}`, [id]);
   const hasBarcode = Boolean(barcode);
 
   const handleSend = async () => {
@@ -166,23 +167,54 @@ export default function OutOrderDetail({ params }: Props) {
     if (!canManual && tab === "manual") setTab("device");
   }, [canManual, tab]);
 
-  const processCode = (rawCode: string) => {
-    const code = rawCode.trim();
-    if (!code) return;
-    const match =
-      itemsRef.current.find(
-        (i) => i.code === code || i.itemId === code,
-      ) || null;
-    if (match) {
-      setManualError(null);
-      focusItem(match.code);
-      updateItem(match.code, 1);
-      setManualCode("");
-    } else {
-      setManualError("Բարկոդը չի գտնվել ցանկում");
-      setManualCode("");
+  const focusItem = useCallback((code: string) => {
+    const target = itemRefs.current[code];
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlighted(code);
+      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(() => setHighlighted(null), 1200);
     }
-  };
+  }, []);
+
+  const updateItem = useCallback((code: string, delta: number) => {
+    setItems((prev) => {
+      const updated = prev.map((item) => {
+        if (item.code !== code) return item;
+        const increment = delta > 0 ? delta : 0;
+        const decrement = delta < 0 ? Math.min(Math.abs(delta), item.current) : 0;
+        const nextCurrent = Math.max(0, item.current + increment - decrement);
+        const nextStock =
+          typeof item.stock === "number"
+            ? Math.max(0, item.stock + increment - decrement)
+            : item.stock;
+        return { ...item, current: nextCurrent, stock: nextStock };
+      });
+      itemsRef.current = updated;
+      return updated;
+    });
+  }, []);
+
+  const processCode = useCallback(
+    (rawCode: string) => {
+      const code = rawCode.trim();
+      if (!code) return;
+      const match =
+        itemsRef.current.find(
+          (i) => i.code === code || i.itemId === code,
+        ) || null;
+      if (match) {
+        setManualError(null);
+        focusItem(match.code);
+        updateItem(match.code, 1);
+        setManualCode("");
+      } else {
+        setManualError("Բարկոդը չի գտնվել ցանկում");
+        setManualCode("");
+      }
+    },
+    [focusItem, updateItem],
+  );
 
   useEffect(() => {
     if (tab === "device" && manualInputRef.current) {
@@ -228,38 +260,31 @@ export default function OutOrderDetail({ params }: Props) {
       if (deviceTimeoutRef.current) clearTimeout(deviceTimeoutRef.current);
       if (deviceIdleTimeoutRef.current) clearTimeout(deviceIdleTimeoutRef.current);
     };
-  }, [tab]);
+  }, [tab, processCode]);
 
-  const focusItem = (code: string) => {
-    const target = itemRefs.current[code];
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
-      setHighlighted(code);
-      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
-      highlightTimeoutRef.current = setTimeout(() => setHighlighted(null), 1200);
-    }
-  };
-
-  const mergeWithBase = (saved: Item[] | null | undefined): Item[] => {
-    if (!baseItems.length) return saved ?? [];
-    const lookup = new Map<string, Item>();
-    baseItems.forEach((i) => lookup.set(i.code || i.itemId, i));
-    if (saved && saved.length) {
-      return saved.map((s) => {
-        const key = s.code || s.itemId;
-        const base = key ? lookup.get(key) : undefined;
-        return {
-          ...s,
-          name: s.name || base?.name || "",
-          itemId: s.itemId || base?.itemId || "",
-          articul: s.articul || base?.articul || "",
-          location: s.location || base?.location || "",
-          total: base?.total ?? s.total ?? 0,
-        };
-      });
-    }
-    return baseItems;
-  };
+  const mergeWithBase = useCallback(
+    (saved: Item[] | null | undefined): Item[] => {
+      if (!baseItems.length) return saved ?? [];
+      const lookup = new Map<string, Item>();
+      baseItems.forEach((i) => lookup.set(i.code || i.itemId, i));
+      if (saved && saved.length) {
+        return saved.map((s) => {
+          const key = s.code || s.itemId;
+          const base = key ? lookup.get(key) : undefined;
+          return {
+            ...s,
+            name: s.name || base?.name || "",
+            itemId: s.itemId || base?.itemId || "",
+            articul: s.articul || base?.articul || "",
+            location: s.location || base?.location || "",
+            total: base?.total ?? s.total ?? 0,
+          };
+        });
+      }
+      return baseItems;
+    },
+    [baseItems],
+  );
 
   const notFound = hydrated && doc === null;
 
@@ -292,7 +317,7 @@ export default function OutOrderDetail({ params }: Props) {
       setItems(merged);
       itemsRef.current = merged;
     }
-  }, [storageKey, baseItems]);
+  }, [storageKey, baseItems, mergeWithBase]);
 
   useEffect(() => {
     const handleDetection = (raw: string) => {
@@ -449,24 +474,6 @@ export default function OutOrderDetail({ params }: Props) {
     return stopCamera;
   }, [tab, cameraActive]);
 
-  const updateItem = (code: string, delta: number) => {
-    setItems((prev) => {
-      const updated = prev.map((item) => {
-        if (item.code !== code) return item;
-        const increment = delta > 0 ? delta : 0;
-        const decrement = delta < 0 ? Math.min(Math.abs(delta), item.current) : 0;
-        const nextCurrent = Math.max(0, item.current + increment - decrement);
-        const nextStock =
-          typeof item.stock === "number"
-            ? Math.max(0, item.stock + increment - decrement)
-            : item.stock;
-        return { ...item, current: nextCurrent, stock: nextStock };
-      });
-      itemsRef.current = updated;
-      return updated;
-    });
-  };
-
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
@@ -526,8 +533,9 @@ export default function OutOrderDetail({ params }: Props) {
     </div>
   );
 
-  const renderContent = () => (
-    <div className="space-y-4">
+  const renderContent = () => {
+    return (
+      <div className="space-y-4">
       <div className="rounded-xl border bg-card text-card-foreground shadow">
         <div className="p-6 pt-6">
           <div dir="ltr" data-orientation="horizontal" className="w-full">
@@ -751,11 +759,12 @@ export default function OutOrderDetail({ params }: Props) {
           {sendLoading ? "Ուղարկվում է..." : "Ուղարկել 1C"}
         </button>
       </div>
-      {sendError && (
-        <div className="mt-3 text-sm text-red-600">{sendError}</div>
-      )}
-    </div>
-  );
+        {sendError && (
+          <div className="mt-3 text-sm text-red-600">{sendError}</div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <AuthGuard>

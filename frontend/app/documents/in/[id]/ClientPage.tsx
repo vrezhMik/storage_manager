@@ -20,7 +20,7 @@ const statusColorClass = (current: number, total: number) => {
   return "text-[hsl(var(--destructive))]";
 };
 
-type Props = { params: { id: string } };
+type Props = { id?: string };
 
 type Item = {
   code: string;
@@ -33,7 +33,7 @@ type Item = {
   stock: number;
 };
 
-export default function InOrderDetail({ params }: Props) {
+export default function InOrderDetail({ id }: Props) {
   const [doc, setDoc] = useState<PurchaseDoc | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
@@ -43,12 +43,13 @@ export default function InOrderDetail({ params }: Props) {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed: PurchaseDoc[] = JSON.parse(raw);
-      const found = parsed.find((d) => d.id === params.id) ?? null;
+      const targetId = id ?? parsed[0]?.id;
+      const found = parsed.find((d) => d.id === targetId) ?? null;
       setDoc(found);
     } catch {
       setDoc(null);
     }
-  }, [params.id]);
+  }, [id]);
   const baseItems = useMemo<Item[]>(() => {
     const mapped = doc?.items?.map((item) => ({
       code: item?.Barcode || item?.ItemID || "-",
@@ -95,7 +96,7 @@ export default function InOrderDetail({ params }: Props) {
   const deviceBufferRef = useRef<string>("");
   const deviceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const deviceIdleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const storageKey = useMemo(() => `in-order-${params.id}`, [params.id]);
+  const storageKey = useMemo(() => `in-order-${id ?? "default"}`, [id]);
   const hasBarcode = Boolean(barcode);
 
   useEffect(() => {

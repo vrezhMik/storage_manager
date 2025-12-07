@@ -117,7 +117,9 @@ export default function DocumentsInPage() {
           <DocumentList
             documents={docs}
             loading={loading}
-            onSelect={(id) => router.push(`/documents/in/${id}`)}
+            onSelect={(id) =>
+              router.push(`/documents/in/single?id=${encodeURIComponent(id)}`)
+            }
           />
         </main>
         <section

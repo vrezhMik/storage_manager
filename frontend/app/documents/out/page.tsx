@@ -115,7 +115,7 @@ export default function DocumentsOutPage() {
           <DocumentList
             documents={docs}
             loading={loading}
-            onSelect={(id) => router.push(`/documents/out/${id}`)}
+            onSelect={(id) => router.push(`/documents/out/single?id=${encodeURIComponent(id)}`)}
           />
         </main>
         <section
