@@ -76,6 +76,7 @@ export default function InOrderDetail({ params }: Props) {
   const [manualError, setManualError] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>(baseItems);
   const itemsRef = useRef<Item[]>(baseItems);
+  const manualInputRef = useRef<HTMLInputElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const zxingRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -91,12 +92,78 @@ export default function InOrderDetail({ params }: Props) {
   const [cameraActive, setCameraActive] = useState(false);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const highlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const deviceBufferRef = useRef<string>("");
+  const deviceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const deviceIdleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const storageKey = useMemo(() => `in-order-${params.id}`, [params.id]);
   const hasBarcode = Boolean(barcode);
 
   useEffect(() => {
     if (!canManual && tab === "manual") setTab("device");
   }, [canManual, tab]);
+
+  const processCode = (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+    const match =
+      itemsRef.current.find(
+        (i) => i.code === code || i.itemId === code,
+      ) || null;
+    if (match) {
+      setManualError(null);
+      focusItem(match.code);
+      updateItem(match.code, 1);
+      setManualCode("");
+    } else {
+      setManualError("Բարկոդը չի գտնվել ցանկում");
+      setManualCode("");
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "device" && manualInputRef.current) {
+      manualInputRef.current.focus();
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (tab !== "device") return;
+      e.stopPropagation();
+      const key = e.key;
+      if (key === "Enter") {
+        e.preventDefault();
+        const code = deviceBufferRef.current;
+        deviceBufferRef.current = "";
+        if (deviceTimeoutRef.current) {
+          clearTimeout(deviceTimeoutRef.current);
+          deviceTimeoutRef.current = null;
+        }
+        if (deviceIdleTimeoutRef.current) {
+          clearTimeout(deviceIdleTimeoutRef.current);
+          deviceIdleTimeoutRef.current = null;
+        }
+        processCode(code);
+        return;
+      }
+      if (key.length === 1) {
+        deviceBufferRef.current += key;
+        if (deviceTimeoutRef.current) clearTimeout(deviceTimeoutRef.current);
+        deviceTimeoutRef.current = setTimeout(() => {
+          deviceBufferRef.current = "";
+        }, 600);
+        if (deviceIdleTimeoutRef.current) clearTimeout(deviceIdleTimeoutRef.current);
+        deviceIdleTimeoutRef.current = setTimeout(() => {
+          const buffered = deviceBufferRef.current;
+          deviceBufferRef.current = "";
+          if (buffered) processCode(buffered);
+        }, 900);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      if (deviceTimeoutRef.current) clearTimeout(deviceTimeoutRef.current);
+      if (deviceIdleTimeoutRef.current) clearTimeout(deviceIdleTimeoutRef.current);
+    };
+  }, [tab]);
 
   const focusItem = (code: string) => {
     const target = itemRefs.current[code];
@@ -445,34 +512,28 @@ export default function InOrderDetail({ params }: Props) {
                         Սարք
                       </button>
                     </div>
-                    <form
-                      className="mt-3 flex gap-2"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const code = manualCode.trim();
-                      if (!code) return;
-                      const match =
-                        itemsRef.current.find(
-                          (i) => i.code === code || i.itemId === code,
-                        ) || null;
-                      if (match) {
-                        setManualError(null);
-                        focusItem(match.code);
-                        updateItem(match.code, 1);
-                        if (canManual) setTab("manual");
-                      } else {
-                        setManualError("Բարկոդը չի գտնվել ցանկում");
-                      }
-                    }}
-                  >
-                      <input
-                        className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        placeholder="Մուտքագրեք բարկոդը"
+            <form
+              className="mt-3 flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              processCode(manualCode);
+              if (tab === "device") {
+                setTimeout(() => manualInputRef.current?.focus(), 0);
+              } else if (canManual) {
+                setTab("manual");
+              }
+            }}
+          >
+              <input
+                        ref={manualInputRef}
+                className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        placeholder={tab === "device" ? "Սկանավորեք սարքով" : "Մուտքագրեք բարկոդը"}
+                        autoFocus={tab === "device"}
                         value={manualCode}
                         onChange={(e) => setManualCode(e.target.value)}
-                      />
-                      <button
-                        type="submit"
+              />
+              <button
+                type="submit"
                         className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90"
                       >
                         Գտնել
