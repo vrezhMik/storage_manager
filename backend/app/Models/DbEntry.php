@@ -15,5 +15,7 @@ class DbEntry extends Model
         'password',
         'api_get_purchase',
         'api_get_orders',
+        'api_post_orders',
+        'api_post_purchases',
     ];
 }

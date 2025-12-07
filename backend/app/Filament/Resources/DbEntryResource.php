@@ -48,6 +48,14 @@ class DbEntryResource extends Resource
                 ->label('API: Get Orders')
                 ->required()
                 ->maxLength(255),
+            Forms\Components\TextInput::make('api_post_orders')
+                ->label('API: Post Orders')
+                ->required()
+                ->maxLength(255),
+            Forms\Components\TextInput::make('api_post_purchases')
+                ->label('API: Post Purchases')
+                ->required()
+                ->maxLength(255),
         ]);
     }
 
@@ -67,6 +75,14 @@ class DbEntryResource extends Resource
                     ->tooltip(fn ($state) => $state),
                 Tables\Columns\TextColumn::make('api_get_orders')
                     ->label('Get Orders API')
+                    ->limit(50)
+                    ->tooltip(fn ($state) => $state),
+                Tables\Columns\TextColumn::make('api_post_orders')
+                    ->label('Post Orders API')
+                    ->limit(50)
+                    ->tooltip(fn ($state) => $state),
+                Tables\Columns\TextColumn::make('api_post_purchases')
+                    ->label('Post Purchases API')
                     ->limit(50)
                     ->tooltip(fn ($state) => $state),
                 Tables\Columns\TextColumn::make('created_at')
