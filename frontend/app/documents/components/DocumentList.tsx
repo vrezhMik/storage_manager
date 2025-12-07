@@ -29,22 +29,18 @@ export default function DocumentList({
             key={`skeleton-${idx}`}
             className="relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow backdrop-blur-sm animate-pulse"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-70" />
-            <div className="p-4 space-y-4 relative">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex-1 space-y-2">
-                  <div className="h-5 w-24 rounded bg-muted-foreground/25 blur-[0.3px]" />
-                  <div className="h-4 w-16 rounded bg-muted-foreground/20 blur-[0.3px]" />
+            <div className="relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow backdrop-blur-sm animate-pulse">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-70" />
+              <div className="p-4 space-y-4 relative">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 space-y-2">
+                    <div className="h-5 w-24 rounded bg-muted-foreground/25 blur-[0.3px] bg-primary" />
+                    <div className="h-4 w-16 rounded bg-muted-foreground/20 blur-[0.3px] bg-primary" />
+                  </div>
+                  <div className="h-6 w-6 rounded-full bg-muted-foreground/20 blur-[0.3px] bg-primary" />
                 </div>
-                <div className="h-6 w-6 rounded-full bg-muted-foreground/20 blur-[0.3px]" />
+                <div className="h-4 w-3/4 rounded bg-muted-foreground/15 blur-[0.4px] bg-primary" />
               </div>
-              <div className="h-4 w-3/4 rounded bg-muted-foreground/15 blur-[0.4px]" />
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-20 rounded bg-muted-foreground/15 blur-[0.4px]" />
-                <div className="h-4 w-14 rounded bg-muted-foreground/15 blur-[0.4px]" />
-                <div className="h-4 w-10 rounded bg-muted-foreground/15 blur-[0.4px]" />
-              </div>
-              <div className="h-9 w-full rounded-md bg-muted-foreground/10 blur-[0.5px]" />
             </div>
           </div>
         ))}
@@ -63,7 +59,9 @@ export default function DocumentList({
                   <h3 className="text-lg font-semibold text-foreground">
                     № {doc.id}
                   </h3>
-                  <span className="text-sm text-muted-foreground">{doc.date}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {doc.date}
+                  </span>
                 </div>
                 <p className="text-sm text-muted-foreground">{doc.title}</p>
               </div>

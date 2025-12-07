@@ -13,7 +13,9 @@ const API_BASE =
 export type OrderDoc = {
   id: string;
   date: string;
+  transactionDate?: string;
   title: string;
+  clientId?: string;
   items?: any[];
 };
 
@@ -70,7 +72,9 @@ export default function DocumentsOutPage() {
           ? data.Documents.map((doc: any) => ({
               id: doc?.Number ?? "-",
               date: (doc?.Date ?? "").split("T")[0] || "",
+              transactionDate: doc?.Date ?? "",
               title: doc?.ClientName ?? "",
+              clientId: doc?.ClientID ?? "",
               items: Array.isArray(doc?.Items) ? doc.Items : [],
             }))
           : [];

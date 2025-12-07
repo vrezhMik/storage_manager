@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { clearAuthStorage, authFetch, API_BASE } from "../lib/auth";
 
@@ -14,35 +14,31 @@ type Props = {
 export default function AuthGuard({ children }: Props) {
   const router = useRouter();
   const [allowed, setAllowed] = useState(() => (hasCheckedOnce ? lastAllowed : true));
+  const checkedRef = useRef(false);
 
   useEffect(() => {
-    if (hasCheckedOnce) {
-      // Already verified in this session; keep state in sync and skip network call.
-      setAllowed(lastAllowed);
-      if (!lastAllowed) router.replace("/login");
-      return;
-    }
+    if (hasCheckedOnce || checkedRef.current) return;
+    checkedRef.current = true;
     const controller = new AbortController();
     let active = true;
+    // mark as checked up front to avoid duplicate fetches in React strict double-invoke
+    hasCheckedOnce = true;
     const ensure = async () => {
       try {
         const res = await authFetch(`${API_BASE}/auth/me`, { signal: controller.signal });
         if (!active) return;
         if (!res.ok) {
           clearAuthStorage();
-          hasCheckedOnce = true;
           lastAllowed = false;
           router.replace("/login");
           return;
         }
-        hasCheckedOnce = true;
         lastAllowed = true;
         setAllowed(true);
       } catch (err: any) {
         if (!active) return;
         if (err?.name === "AbortError") return;
         clearAuthStorage();
-        hasCheckedOnce = true;
         lastAllowed = false;
         router.replace("/login");
       }

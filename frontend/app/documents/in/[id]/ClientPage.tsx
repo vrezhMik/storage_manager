@@ -9,7 +9,7 @@ import SaveIcon from "../../../UI/SaveIcon";
 import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
 import AuthGuard from "../../../components/AuthGuard";
-import { USER_MANUAL_ALLOWED_KEY } from "../../../lib/auth";
+import { USER_MANUAL_ALLOWED_KEY, API_BASE } from "../../../lib/auth";
 import { PurchaseDoc } from "../page";
 
 const STORAGE_KEY = "purchases-data";
@@ -34,15 +34,19 @@ type Item = {
 };
 
 export default function InOrderDetail({ params }: Props) {
-  const doc = useMemo(() => {
-    if (typeof window === "undefined") return null;
+  const [doc, setDoc] = useState<PurchaseDoc | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sendLoading, setSendLoading] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return null;
+      if (!raw) return;
       const parsed: PurchaseDoc[] = JSON.parse(raw);
-      return parsed.find((d) => d.id === params.id) ?? null;
+      const found = parsed.find((d) => d.id === params.id) ?? null;
+      setDoc(found);
     } catch {
-      return null;
+      setDoc(null);
     }
   }, [params.id]);
   const baseItems = useMemo<Item[]>(() => {
@@ -330,6 +334,68 @@ export default function InOrderDetail({ params }: Props) {
     window.localStorage.setItem(storageKey, JSON.stringify(itemsRef.current));
   };
 
+  const formatTransactionDate = (value?: string | null) => {
+    if (!value) return undefined;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const day = pad(parsed.getDate());
+    const month = pad(parsed.getMonth() + 1);
+    const year = parsed.getFullYear();
+    const hours = pad(parsed.getHours());
+    const minutes = pad(parsed.getMinutes());
+    const seconds = pad(parsed.getSeconds());
+    return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
+  };
+
+  const handleSend = async () => {
+    setSendError(null);
+    if (!doc) return;
+    const payload = {
+      Number: doc.id,
+      ClientID: doc.clientId ?? "",
+      TransactionDate: formatTransactionDate(doc.transactionDate || doc.date),
+      Items: items
+        .filter((i) => i.current > 0)
+        .map((i) => ({
+          ItemID: i.itemId || i.code,
+          Quantity: i.current,
+        })),
+    };
+
+    if (payload.Items.length === 0) {
+      setSendError("Քանակ նշված չէ ուղարկելու համար");
+      return;
+    }
+
+    try {
+      setSendLoading(true);
+      const res = await fetch(`${API_BASE}/purchases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        let message = `Չհաջողվեց ուղարկել (${res.status})`;
+        try {
+          const body = JSON.parse(text);
+          message = body?.message ?? message;
+        } catch {
+          if (text) message = text;
+        }
+        throw new Error(message);
+      }
+    } catch (err: any) {
+      setSendError(err?.message ?? "Չհաջողվեց ուղարկել");
+    } finally {
+      setSendLoading(false);
+    }
+  };
+
   return (
     <AuthGuard>
       <div className="App">
@@ -556,11 +622,18 @@ export default function InOrderDetail({ params }: Props) {
                 <SaveIcon className="mr-2 h-4 w-4" />
                 Պահպանել
               </button>
-              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2 h-12">
+              <button
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-primary/90 px-4 py-2 h-12"
+                onClick={handleSend}
+                disabled={sendLoading}
+              >
                 <SendIcon className="mr-2 h-4 w-4" />
-                Ուղարկել
+                {sendLoading ? "Ուղարկվում է..." : "Ուղարկել 1C"}
               </button>
             </div>
+            {sendError && (
+              <div className="mt-3 text-sm text-red-600">{sendError}</div>
+            )}
           </div>
         </main>
       </div>
