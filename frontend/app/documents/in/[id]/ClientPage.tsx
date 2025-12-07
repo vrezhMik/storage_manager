@@ -106,9 +106,8 @@ export default function InOrderDetail({ params }: Props) {
     const code = rawCode.trim();
     if (!code) return;
     const match =
-      itemsRef.current.find(
-        (i) => i.code === code || i.itemId === code,
-      ) || null;
+      itemsRef.current.find((i) => i.code === code || i.itemId === code) ||
+      null;
     if (match) {
       setManualError(null);
       focusItem(match.code);
@@ -149,7 +148,8 @@ export default function InOrderDetail({ params }: Props) {
         deviceTimeoutRef.current = setTimeout(() => {
           deviceBufferRef.current = "";
         }, 600);
-        if (deviceIdleTimeoutRef.current) clearTimeout(deviceIdleTimeoutRef.current);
+        if (deviceIdleTimeoutRef.current)
+          clearTimeout(deviceIdleTimeoutRef.current);
         deviceIdleTimeoutRef.current = setTimeout(() => {
           const buffered = deviceBufferRef.current;
           deviceBufferRef.current = "";
@@ -161,7 +161,8 @@ export default function InOrderDetail({ params }: Props) {
     return () => {
       window.removeEventListener("keydown", onKey);
       if (deviceTimeoutRef.current) clearTimeout(deviceTimeoutRef.current);
-      if (deviceIdleTimeoutRef.current) clearTimeout(deviceIdleTimeoutRef.current);
+      if (deviceIdleTimeoutRef.current)
+        clearTimeout(deviceIdleTimeoutRef.current);
     };
   }, [tab]);
 
@@ -170,8 +171,12 @@ export default function InOrderDetail({ params }: Props) {
     if (target) {
       target.scrollIntoView({ behavior: "smooth", block: "center" });
       setHighlighted(code);
-      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
-      highlightTimeoutRef.current = setTimeout(() => setHighlighted(null), 1200);
+      if (highlightTimeoutRef.current)
+        clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(
+        () => setHighlighted(null),
+        1200
+      );
     }
   };
 
@@ -240,8 +245,12 @@ export default function InOrderDetail({ params }: Props) {
         setScanError(null);
         updateItem(code, 1);
         setHighlighted(code);
-        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
-        highlightTimeoutRef.current = setTimeout(() => setHighlighted(null), 1200);
+        if (highlightTimeoutRef.current)
+          clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = setTimeout(
+          () => setHighlighted(null),
+          1200
+        );
         const target = itemRefs.current[code];
         if (target) {
           target.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -259,7 +268,8 @@ export default function InOrderDetail({ params }: Props) {
 
     const startCamera = async () => {
       if (streamRef.current) return;
-      const hasDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
+      const hasDetector =
+        typeof window !== "undefined" && "BarcodeDetector" in window;
 
       const requestStream = async () => {
         try {
@@ -285,7 +295,9 @@ export default function InOrderDetail({ params }: Props) {
         }
       } catch (err) {
         console.error("Camera start failed", err);
-        setScanError("Տեսախցիկը չի միանում․ թույլատրեք հասանելիությունը և փորձեք կրկին");
+        setScanError(
+          "Տեսախցիկը չի միանում․ թույլատրեք հասանելիությունը և փորձեք կրկին"
+        );
       }
     };
 
@@ -379,7 +391,8 @@ export default function InOrderDetail({ params }: Props) {
       const updated = prev.map((item) => {
         if (item.code !== code) return item;
         const increment = delta > 0 ? delta : 0;
-        const decrement = delta < 0 ? Math.min(Math.abs(delta), item.current) : 0;
+        const decrement =
+          delta < 0 ? Math.min(Math.abs(delta), item.current) : 0;
         const nextCurrent = Math.max(0, item.current + increment - decrement);
         const nextStock =
           typeof item.stock === "number"
@@ -474,7 +487,9 @@ export default function InOrderDetail({ params }: Props) {
                   <div
                     role="tablist"
                     aria-orientation="horizontal"
-                    className={`h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full ${canManual ? "grid-cols-3" : "grid-cols-2"}`}
+                    className={`h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full ${
+                      canManual ? "grid-cols-3" : "grid-cols-2"
+                    }`}
                   >
                     {canManual && (
                       <button
@@ -503,52 +518,58 @@ export default function InOrderDetail({ params }: Props) {
                     <button
                       type="button"
                       role="tab"
-                        aria-selected={tab === "device"}
-                        data-state={tab === "device" ? "active" : "inactive"}
-                        onClick={() => setTab("device")}
-                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
-                      >
-                        <ScanIcon className="h-3.5 w-3.5 mr-1" />
-                        Սարք
-                      </button>
-                    </div>
-            <form
-              className="mt-3 flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              processCode(manualCode);
-              if (tab === "device") {
-                setTimeout(() => manualInputRef.current?.focus(), 0);
-              } else if (canManual) {
-                setTab("manual");
-              }
-            }}
-          >
-              <input
-                        ref={manualInputRef}
-                className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        placeholder={tab === "device" ? "Սկանավորեք սարքով" : "Մուտքագրեք բարկոդը"}
-                        autoFocus={tab === "device"}
-                        value={manualCode}
-                        onChange={(e) => setManualCode(e.target.value)}
-              />
-              <button
-                type="submit"
-                        className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90"
-                      >
-                        Գտնել
-                      </button>
-                    </form>
-                    {manualError && (
-                      <p className="mt-2 text-xs text-red-600">{manualError}</p>
-                    )}
+                      aria-selected={tab === "device"}
+                      data-state={tab === "device" ? "active" : "inactive"}
+                      onClick={() => setTab("device")}
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
+                    >
+                      <ScanIcon className="h-3.5 w-3.5 mr-1" />
+                      Սարք
+                    </button>
                   </div>
+                  <form
+                    className="mt-3 flex gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      processCode(manualCode);
+                      if (tab === "device") {
+                        setTimeout(() => manualInputRef.current?.focus(), 0);
+                      } else if (canManual) {
+                        setTab("manual");
+                      }
+                    }}
+                  >
+                    <input
+                      ref={manualInputRef}
+                      className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder={
+                        tab === "device"
+                          ? "Սկանավորեք սարքով"
+                          : "Մուտքագրեք բարկոդը"
+                      }
+                      autoFocus={tab === "device"}
+                      value={manualCode}
+                      onChange={(e) => setManualCode(e.target.value)}
+                    />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90"
+                    >
+                      Գտնել
+                    </button>
+                  </form>
+                  {manualError && (
+                    <p className="mt-2 text-xs text-red-600">{manualError}</p>
+                  )}
                 </div>
+              </div>
             </div>
 
             <div className="rounded-xl border bg-card text-card-foreground shadow">
               <div className="flex flex-col space-y-1.5 p-6 pb-3">
-                <div className="font-semibold tracking-tight text-base">Ապրանքներ</div>
+                <div className="font-semibold tracking-tight text-base">
+                  Ապրանքներ
+                </div>
               </div>
               <div className="p-0 space-y-0">
                 {tab === "camera" && (
@@ -588,8 +609,16 @@ export default function InOrderDetail({ params }: Props) {
                       </div>
                     )}
                     <div className="px-4 py-2 text-xs text-white/80 flex justify-between">
-                      <span>{barcode ? `Գտնված բարկոդը: ${barcode}` : cameraActive ? "Սկանավորում..." : "Տեսախցիկը անջատված է"}</span>
-                      {scanError && <span className="text-red-400">{scanError}</span>}
+                      <span>
+                        {barcode
+                          ? `Գտնված բարկոդը: ${barcode}`
+                          : cameraActive
+                          ? "Սկանավորում..."
+                          : "Տեսախցիկը անջատված է"}
+                      </span>
+                      {scanError && (
+                        <span className="text-red-400">{scanError}</span>
+                      )}
                     </div>
                   </div>
                 )}
@@ -611,9 +640,13 @@ export default function InOrderDetail({ params }: Props) {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
-                        
                           <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-muted text-muted-foreground border-border shrink-0">
-                            <span className={statusColorClass(item.current, item.total)}>
+                            <span
+                              className={statusColorClass(
+                                item.current,
+                                item.total
+                              )}
+                            >
                               {item.current}/{item.total}
                             </span>
                           </div>
@@ -654,7 +687,10 @@ export default function InOrderDetail({ params }: Props) {
                             >
                               {item.current}
                             </span>
-                            <span className="text-sm text-muted-foreground"> / {item.total}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {" "}
+                              / {item.total}
+                            </span>
                           </div>
                           <button
                             className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
