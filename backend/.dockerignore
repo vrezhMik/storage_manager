@@ -1,0 +1,10 @@
+.env
+node_modules
+vendor
+storage/logs/*.log
+storage/framework/cache/*.php
+storage/framework/views/*.php
+storage/framework/sessions/*.php
+npm-debug.log
+yarn-error.log
+bootstrap/cache/*.php
