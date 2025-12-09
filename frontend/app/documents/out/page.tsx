@@ -39,6 +39,11 @@ export default function DocumentsOutPage() {
   const [docs, setDocs] = useState<OrderDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
@@ -115,6 +120,10 @@ export default function DocumentsOutPage() {
       controller.abort();
     };
   }, []);
+
+  if (!hydrated) {
+    return null;
+  }
 
   return (
     <AuthGuard>

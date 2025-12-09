@@ -39,6 +39,11 @@ export default function DocumentsInPage() {
   const [docs, setDocs] = useState<PurchaseDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -117,6 +122,10 @@ export default function DocumentsInPage() {
       controller.abort();
     };
   }, []);
+
+  if (!hydrated) {
+    return null;
+  }
 
   return (
     <AuthGuard>
