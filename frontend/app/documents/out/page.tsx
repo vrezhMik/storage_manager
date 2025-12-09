@@ -7,6 +7,13 @@ const DocumentsOutPageClient = dynamic(
   },
 );
 
+
+import { Suspense } from "react";
+
 export default function Page() {
-  return <DocumentsOutPageClient />;
+  return (
+    <Suspense fallback={null}>
+      <DocumentsOutPageClient />
+    </Suspense>
+  );
 }

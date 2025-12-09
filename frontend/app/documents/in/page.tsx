@@ -7,6 +7,13 @@ const DocumentsInPageClient = dynamic(
   },
 );
 
+
+import { Suspense } from "react";
+
 export default function Page() {
-  return <DocumentsInPageClient />;
+  return (
+    <Suspense fallback={null}>
+      <DocumentsInPageClient />
+    </Suspense>
+  );
 }
