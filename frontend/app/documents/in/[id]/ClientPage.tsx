@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import CameraIcon from "../../../UI/CameraIcon";
 import MinusIcon from "../../../UI/MinusIcon";
@@ -35,10 +34,8 @@ type Item = {
 };
 
 export default function InOrderDetail({ id }: Props) {
-  const searchParams = useSearchParams();
-  const urlId = searchParams.get("id");
   const normalizeId = (value: string | null | undefined) => (value ?? "").trim();
-  const targetId = normalizeId(id ?? urlId);
+  const targetId = normalizeId(id);
   const [doc, setDoc] = useState<PurchaseDoc | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendLoading, setSendLoading] = useState(false);

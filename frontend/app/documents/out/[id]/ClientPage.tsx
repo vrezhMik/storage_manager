@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { useRouter } from "next/navigation";
-import { useSearchParams } from "next/navigation";
 import ArrowUpFromLineIcon from "../../../UI/ArrowUpFromLineIcon";
 import CameraIcon from "../../../UI/CameraIcon";
 import MinusIcon from "../../../UI/MinusIcon";
@@ -48,10 +47,8 @@ const formatTransactionDate = (value?: string | null) => {
 
 export default function OutOrderDetail({ id }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const urlId = searchParams.get("id");
   const normalizeId = (value: string | null | undefined) => (value ?? "").trim();
-  const targetId = normalizeId(id ?? urlId);
+  const targetId = normalizeId(id);
   const [hydrated, setHydrated] = useState(false);
   const [doc, setDoc] = useState<OrderDoc | null | undefined>(undefined);
   useEffect(() => {
