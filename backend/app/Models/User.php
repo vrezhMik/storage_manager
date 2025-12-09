@@ -25,6 +25,7 @@ class User extends Authenticatable
         'password',
         'db_entry_id',
         'allow_manual_items',
+        'allow_manual_text_input',
     ];
 
     /**
@@ -47,6 +48,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'allow_manual_items' => 'boolean',
+            'allow_manual_text_input' => 'boolean',
         ];
     }
 

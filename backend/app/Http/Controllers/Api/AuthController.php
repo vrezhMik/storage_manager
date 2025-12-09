@@ -120,6 +120,7 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'allow_manual_items' => (bool) $user->allow_manual_items,
+                'allow_manual_text_input' => (bool) $user->allow_manual_text_input,
             ],
         ];
     }

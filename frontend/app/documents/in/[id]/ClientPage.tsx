@@ -11,6 +11,7 @@ import ScanIcon from "../../../UI/ScanIcon";
 import AuthGuard from "../../../components/AuthGuard";
 import {
   USER_MANUAL_ALLOWED_KEY,
+  USER_MANUAL_TEXT_ALLOWED_KEY,
   API_BASE,
   authFetch,
 } from "../../../lib/auth";
@@ -150,6 +151,12 @@ export default function InOrderDetail({ id }: Props) {
   const canManual = useMemo(() => {
     if (typeof window === "undefined") return true;
     const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
+    return stored !== "false";
+  }, []);
+  const canManualTextInput = useMemo(() => {
+    if (typeof window === "undefined") return true;
+    const stored =
+      window.localStorage.getItem(USER_MANUAL_TEXT_ALLOWED_KEY);
     return stored !== "false";
   }, []);
   const [tab, setTab] = useState<"manual" | "camera" | "device">(() => {
@@ -661,39 +668,43 @@ export default function InOrderDetail({ id }: Props) {
                       Սարք
                     </button>
                   </div>
-                  <form
-                    className="mt-3 flex gap-2"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      processCode(manualCode);
-                      if (tab === "device") {
-                        setTimeout(() => manualInputRef.current?.focus(), 0);
-                      } else if (canManual) {
-                        setTab("manual");
-                      }
-                    }}
-                  >
-                    <input
-                      ref={manualInputRef}
-                      className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      placeholder={
-                        tab === "device"
-                          ? "Սկանավորեք սարքով"
-                          : "Մուտքագրեք բարկոդը"
-                      }
-                      autoFocus={tab === "device"}
-                      value={manualCode}
-                      onChange={(e) => setManualCode(e.target.value)}
-                    />
-                    <button
-                      type="submit"
-                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90"
-                    >
-                      Գտնել
-                    </button>
-                  </form>
-                  {manualError && (
-                    <p className="mt-2 text-xs text-red-600">{manualError}</p>
+                  {canManualTextInput && (
+                    <>
+                      <form
+                        className="mt-3 flex gap-2"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          processCode(manualCode);
+                          if (tab === "device") {
+                            setTimeout(() => manualInputRef.current?.focus(), 0);
+                          } else if (canManual) {
+                            setTab("manual");
+                          }
+                        }}
+                      >
+                        <input
+                          ref={manualInputRef}
+                          className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          placeholder={
+                            tab === "device"
+                              ? "Սկանավորեք սարքով"
+                              : "Մուտքագրեք բարկոդը"
+                          }
+                          autoFocus={tab === "device"}
+                          value={manualCode}
+                          onChange={(e) => setManualCode(e.target.value)}
+                        />
+                        <button
+                          type="submit"
+                          className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90"
+                        >
+                          Գտնել
+                        </button>
+                      </form>
+                      {manualError && (
+                        <p className="mt-2 text-xs text-red-600">{manualError}</p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

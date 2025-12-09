@@ -3,6 +3,7 @@ export const REFRESH_TOKEN_KEY = "refresh_token";
 export const ACCESS_EXPIRES_AT_KEY = "access_expires_at";
 export const USER_EMAIL_KEY = "user_email";
 export const USER_MANUAL_ALLOWED_KEY = "user_manual_allowed";
+export const USER_MANUAL_TEXT_ALLOWED_KEY = "user_manual_text_allowed";
 
 const isBrowser = typeof window !== "undefined";
 const API_BASE =
@@ -11,7 +12,11 @@ const API_BASE =
 export { API_BASE };
 
 export function storeAuthTokens(data: {
-  user?: { email?: string; allow_manual_items?: boolean };
+  user?: {
+    email?: string;
+    allow_manual_items?: boolean;
+    allow_manual_text_input?: boolean;
+  };
 }) {
   if (!isBrowser) return;
   if (data.user?.email) {
@@ -21,6 +26,12 @@ export function storeAuthTokens(data: {
     window.localStorage.setItem(
       USER_MANUAL_ALLOWED_KEY,
       String(data.user.allow_manual_items),
+    );
+  }
+  if (typeof data.user?.allow_manual_text_input === "boolean") {
+    window.localStorage.setItem(
+      USER_MANUAL_TEXT_ALLOWED_KEY,
+      String(data.user.allow_manual_text_input),
     );
   }
 }
@@ -33,6 +44,7 @@ export function clearAuthStorage() {
     ACCESS_EXPIRES_AT_KEY,
     USER_EMAIL_KEY,
     USER_MANUAL_ALLOWED_KEY,
+    USER_MANUAL_TEXT_ALLOWED_KEY,
   ].forEach((key) => window.localStorage.removeItem(key));
 }
 

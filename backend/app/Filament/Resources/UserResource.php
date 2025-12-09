@@ -46,6 +46,10 @@ class UserResource extends Resource
                 ->label('Allow manual item input')
                 ->default(true)
                 ->helperText('If disabled, users can only use camera/device scanning'),
+            Forms\Components\Toggle::make('allow_manual_text_input')
+                ->label('Allow manual text input')
+                ->default(true)
+                ->helperText('Controls whether the barcode input field is shown'),
             Forms\Components\Select::make('db_entry_id')
                 ->label('DB Config')
                 ->relationship('dbEntry', 'name')
@@ -60,24 +64,27 @@ class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->columns([
-                Tables\Columns\TextColumn::make('name')
-                    ->sortable()
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('email')
-                    ->sortable()
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('dbEntry.name')
-                    ->label('DB Config')
-                    ->sortable()
-                    ->default('-'),
-                Tables\Columns\IconColumn::make('allow_manual_items')
-                    ->boolean()
-                    ->label('Manual input'),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable(),
-            ])
+                ->columns([
+                    Tables\Columns\TextColumn::make('name')
+                        ->sortable()
+                        ->searchable(),
+                    Tables\Columns\TextColumn::make('email')
+                        ->sortable()
+                        ->searchable(),
+                    Tables\Columns\TextColumn::make('dbEntry.name')
+                        ->label('DB Config')
+                        ->sortable()
+                        ->default('-'),
+                    Tables\Columns\IconColumn::make('allow_manual_items')
+                        ->boolean()
+                        ->label('Manual input'),
+                    Tables\Columns\IconColumn::make('allow_manual_text_input')
+                        ->boolean()
+                        ->label('Text input'),
+                    Tables\Columns\TextColumn::make('created_at')
+                        ->dateTime()
+                        ->sortable(),
+                ])
             ->actions([
                 Actions\EditAction::make(),
             ])
