@@ -554,7 +554,7 @@ export default function OutOrderDetail({ id }: Props) {
     }
 
     return stopCamera;
-  }, [tab, cameraActive]);
+  }, [tab, cameraActive, updateItem]);
 
   useEffect(() => {
     itemsRef.current = items;

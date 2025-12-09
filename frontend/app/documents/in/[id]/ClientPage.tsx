@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import CameraIcon from "../../../UI/CameraIcon";
 import MinusIcon from "../../../UI/MinusIcon";
@@ -9,7 +9,11 @@ import SaveIcon from "../../../UI/SaveIcon";
 import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
 import AuthGuard from "../../../components/AuthGuard";
-import { USER_MANUAL_ALLOWED_KEY, API_BASE } from "../../../lib/auth";
+import {
+  USER_MANUAL_ALLOWED_KEY,
+  API_BASE,
+  authFetch,
+} from "../../../lib/auth";
 import { PurchaseDoc } from "../page";
 
 const STORAGE_KEY = "purchases-data";
@@ -33,27 +37,100 @@ type Item = {
   stock: number;
 };
 
+const mapDocId = (doc: any, idx: number) =>
+  String(
+    doc?.Number ??
+      doc?.DocEntry ??
+      doc?.DocumentID ??
+      doc?.DocumentId ??
+      doc?.ID ??
+      doc?.Id ??
+      doc?.DocNum ??
+      doc?.Guid ??
+      idx,
+  );
+
+const mapApiDocs = (data: any): PurchaseDoc[] => {
+  const docs = Array.isArray(data?.Documents) ? data.Documents : [];
+  return docs.map((doc: any, idx: number) => ({
+    id: mapDocId(doc, idx),
+    date: (doc?.Date ?? "").split("T")[0] || "",
+    transactionDate: doc?.Date ?? "",
+    title: doc?.ClientName ?? "",
+    clientId: doc?.ClientID ?? doc?.ClientId ?? "",
+    items: Array.isArray(doc?.Items) ? doc.Items : [],
+  }));
+};
+
 export default function InOrderDetail({ id }: Props) {
   const normalizeId = (value: string | null | undefined) => (value ?? "").trim();
   const targetId = normalizeId(id);
-  const [doc, setDoc] = useState<PurchaseDoc | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+  const [doc, setDoc] = useState<PurchaseDoc | null | undefined>(undefined);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
   useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed: PurchaseDoc[] = JSON.parse(raw);
+    const controller = new AbortController();
+    let active = true;
+
+    const fromCache = (): PurchaseDoc | null => {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        const parsed: PurchaseDoc[] = JSON.parse(raw);
+        return parsed.find((d) => normalizeId(d.id) === targetId) ?? null;
+      } catch {
+        return null;
+      }
+    };
+
+    const cachedDoc = targetId ? fromCache() : null;
+    setDoc(cachedDoc ?? undefined);
+
+    const fetchFresh = async () => {
       if (!targetId) {
         setDoc(null);
         return;
       }
-      const found = parsed.find((d) => normalizeId(d.id) === targetId) ?? null;
-      setDoc(found);
-    } catch {
-      setDoc(null);
+      try {
+        const res = await authFetch(`${API_BASE}/purchases`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to load (${res.status})`);
+        }
+        const text = await res.text();
+        const data = JSON.parse(text);
+        const mapped = mapApiDocs(data);
+        if (!active) return;
+        const found = mapped.find(
+          (d) => normalizeId(d.id) === targetId,
+        ) ?? null;
+        setDoc(found);
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        } catch {
+          // ignore storage errors
+        }
+      } catch (err) {
+        if (!active || controller.signal.aborted) return;
+        setDoc((prev) => (prev === undefined ? null : prev));
+      }
+    };
+
+    if (!cachedDoc) {
+      fetchFresh();
     }
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [targetId]);
   const baseItems = useMemo<Item[]>(() => {
     const mapped = doc?.items?.map((item) => ({
@@ -111,22 +188,58 @@ export default function InOrderDetail({ id }: Props) {
     if (!canManual && tab === "manual") setTab("device");
   }, [canManual, tab]);
 
-  const processCode = (rawCode: string) => {
-    const code = rawCode.trim();
-    if (!code) return;
-    const match =
-      itemsRef.current.find((i) => i.code === code || i.itemId === code) ||
-      null;
-    if (match) {
-      setManualError(null);
-      focusItem(match.code);
-      updateItem(match.code, 1);
-      setManualCode("");
-    } else {
-      setManualError("Բարկոդը չի գտնվել ցանկում");
-      setManualCode("");
+  const focusItem = useCallback((code: string) => {
+    const target = itemRefs.current[code];
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlighted(code);
+      if (highlightTimeoutRef.current)
+        clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(
+        () => setHighlighted(null),
+        1200,
+      );
     }
-  };
+  }, []);
+
+  const updateItem = useCallback((code: string, delta: number) => {
+    setItems((prev) => {
+      const updated = prev.map((item) => {
+        if (item.code !== code) return item;
+        const increment = delta > 0 ? delta : 0;
+        const decrement =
+          delta < 0 ? Math.min(Math.abs(delta), item.current) : 0;
+        const nextCurrent = Math.max(0, item.current + increment - decrement);
+        const nextStock =
+          typeof item.stock === "number"
+            ? Math.max(0, item.stock + increment - decrement)
+            : item.stock;
+        return { ...item, current: nextCurrent, stock: nextStock };
+      });
+      itemsRef.current = updated;
+      return updated;
+    });
+  }, []);
+
+  const processCode = useCallback(
+    (rawCode: string) => {
+      const code = rawCode.trim();
+      if (!code) return;
+      const match =
+        itemsRef.current.find((i) => i.code === code || i.itemId === code) ||
+        null;
+      if (match) {
+        setManualError(null);
+        focusItem(match.code);
+        updateItem(match.code, 1);
+        setManualCode("");
+      } else {
+        setManualError("Բարկոդը չի գտնվել ցանկում");
+        setManualCode("");
+      }
+    },
+    [focusItem, updateItem],
+  );
 
   useEffect(() => {
     if (tab === "device" && manualInputRef.current) {
@@ -173,42 +286,31 @@ export default function InOrderDetail({ id }: Props) {
       if (deviceIdleTimeoutRef.current)
         clearTimeout(deviceIdleTimeoutRef.current);
     };
-  }, [tab]);
+  }, [tab, processCode]);
 
-  const focusItem = (code: string) => {
-    const target = itemRefs.current[code];
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "center" });
-      setHighlighted(code);
-      if (highlightTimeoutRef.current)
-        clearTimeout(highlightTimeoutRef.current);
-      highlightTimeoutRef.current = setTimeout(
-        () => setHighlighted(null),
-        1200
-      );
-    }
-  };
-
-  const mergeWithBase = (saved: Item[] | null | undefined): Item[] => {
-    if (!baseItems.length) return saved ?? [];
-    const lookup = new Map<string, Item>();
-    baseItems.forEach((i) => lookup.set(i.code || i.itemId, i));
-    if (saved && saved.length) {
-      return saved.map((s) => {
-        const key = s.code || s.itemId;
-        const base = key ? lookup.get(key) : undefined;
-        return {
-          ...s,
-          name: s.name || base?.name || "",
-          itemId: s.itemId || base?.itemId || "",
-          articul: s.articul || base?.articul || "",
-          location: s.location || base?.location || "",
-          total: base?.total ?? s.total ?? 0,
-        };
-      });
-    }
-    return baseItems;
-  };
+  const mergeWithBase = useCallback(
+    (saved: Item[] | null | undefined): Item[] => {
+      if (!baseItems.length) return saved ?? [];
+      const lookup = new Map<string, Item>();
+      baseItems.forEach((i) => lookup.set(i.code || i.itemId, i));
+      if (saved && saved.length) {
+        return saved.map((s) => {
+          const key = s.code || s.itemId;
+          const base = key ? lookup.get(key) : undefined;
+          return {
+            ...s,
+            name: s.name || base?.name || "",
+            itemId: s.itemId || base?.itemId || "",
+            articul: s.articul || base?.articul || "",
+            location: s.location || base?.location || "",
+            total: base?.total ?? s.total ?? 0,
+          };
+        });
+      }
+      return baseItems;
+    },
+    [baseItems],
+  );
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -232,7 +334,7 @@ export default function InOrderDetail({ id }: Props) {
         itemsRef.current = merged;
       }
     }
-  }, [storageKey, baseItems]);
+  }, [storageKey, baseItems, mergeWithBase]);
 
   useEffect(() => {
     const handleDetection = (raw: string) => {
@@ -393,26 +495,7 @@ export default function InOrderDetail({ id }: Props) {
     }
 
     return stopCamera;
-  }, [tab, cameraActive]);
-
-  const updateItem = (code: string, delta: number) => {
-    setItems((prev) => {
-      const updated = prev.map((item) => {
-        if (item.code !== code) return item;
-        const increment = delta > 0 ? delta : 0;
-        const decrement =
-          delta < 0 ? Math.min(Math.abs(delta), item.current) : 0;
-        const nextCurrent = Math.max(0, item.current + increment - decrement);
-        const nextStock =
-          typeof item.stock === "number"
-            ? Math.max(0, item.stock + increment - decrement)
-            : item.stock;
-        return { ...item, current: nextCurrent, stock: nextStock };
-      });
-      itemsRef.current = updated;
-      return updated;
-    });
-  };
+  }, [tab, cameraActive, updateItem]);
 
   useEffect(() => {
     itemsRef.current = items;
@@ -485,11 +568,66 @@ export default function InOrderDetail({ id }: Props) {
     }
   };
 
+  const renderSkeleton = () => (
+    <div className="space-y-4">
+      <div className="rounded-xl border bg-card text-card-foreground shadow">
+        <div className="p-6 space-y-4">
+          <div className="h-4 w-1/3 rounded bg-muted animate-pulse" />
+          <div className="flex gap-3">
+            <div className="h-9 flex-1 rounded-md bg-muted animate-pulse" />
+            <div className="h-9 flex-1 rounded-md bg-muted animate-pulse" />
+            <div className="h-9 flex-1 rounded-md bg-muted animate-pulse" />
+          </div>
+        </div>
+      </div>
+      <div className="rounded-xl border bg-card text-card-foreground shadow">
+        <div className="p-6 space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-3 border-b border-border pb-3 last:border-0 last:pb-0">
+              <div className="flex justify-between gap-3">
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
+                  <div className="h-3 w-1/3 rounded bg-muted animate-pulse" />
+                </div>
+                <div className="h-6 w-12 rounded bg-muted animate-pulse" />
+              </div>
+              <div className="h-3 w-3/4 rounded bg-muted animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderNotFound = () => (
+    <div className="space-y-4">
+      <div className="rounded-xl border bg-card text-card-foreground shadow">
+        <div className="p-6 pt-6 text-center space-y-3">
+          <h1 className="text-xl font-semibold text-foreground">Փաստաթուղթը չի գտնվել</h1>
+          <p className="text-muted-foreground text-sm">
+            Վերադարձեք Մուտքերի ցուցակ և ընտրեք փաստաթուղթը նորից։
+          </p>
+          <button
+            onClick={() => history.back()}
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Վերադառնալ
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <AuthGuard>
       <div className="App">
         <main className="container mx-auto px-4 py-6 pb-20">
-          <div className="space-y-4">
+          {!hydrated || doc === undefined ? (
+            renderSkeleton()
+          ) : doc === null ? (
+            renderNotFound()
+          ) : (
+            <div className="space-y-4">
             <div className="rounded-xl border bg-card text-card-foreground shadow">
               <div className="p-6 pt-6">
                 <div dir="ltr" data-orientation="horizontal" className="w-full">
@@ -741,6 +879,7 @@ export default function InOrderDetail({ id }: Props) {
               <div className="mt-3 text-sm text-red-600">{sendError}</div>
             )}
           </div>
+          )}
         </main>
       </div>
       <section
