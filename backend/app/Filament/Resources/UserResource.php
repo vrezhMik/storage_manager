@@ -42,14 +42,6 @@ class UserResource extends Resource
                 ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
                 ->dehydrated(fn ($state) => filled($state))
                 ->maxLength(255),
-            Forms\Components\Toggle::make('allow_manual_items')
-                ->label('Allow manual item input')
-                ->default(true)
-                ->helperText('If disabled, users can only use camera/device scanning'),
-            Forms\Components\Toggle::make('allow_manual_text_input')
-                ->label('Allow manual text input')
-                ->default(true)
-                ->helperText('Controls whether the barcode input field is shown'),
             Forms\Components\Select::make('db_entry_id')
                 ->label('DB Config')
                 ->relationship('dbEntry', 'name')
@@ -58,6 +50,14 @@ class UserResource extends Resource
                 ->native(false)
                 ->helperText('Assign which remote DB/API config this user will use')
                 ->nullable(),
+            Forms\Components\Toggle::make('allow_manual_items')
+                ->label('Allow manual item input')
+                ->default(true)
+                ->helperText('If disabled, users can only use camera/device scanning'),
+            Forms\Components\Toggle::make('allow_manual_text_input')
+                ->label('Allow manual text input')
+                ->default(true)
+                ->helperText('Controls whether the barcode input field is shown'),
         ]);
     }
 
