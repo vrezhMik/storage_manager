@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import CameraIcon from "../../../UI/CameraIcon";
 import MinusIcon from "../../../UI/MinusIcon";
@@ -34,6 +35,9 @@ type Item = {
 };
 
 export default function InOrderDetail({ id }: Props) {
+  const searchParams = useSearchParams();
+  const urlId = searchParams.get("id");
+  const targetId = id ?? urlId ?? undefined;
   const [doc, setDoc] = useState<PurchaseDoc | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
@@ -43,13 +47,16 @@ export default function InOrderDetail({ id }: Props) {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed: PurchaseDoc[] = JSON.parse(raw);
-      const targetId = id ?? parsed[0]?.id;
+      if (!targetId) {
+        setDoc(null);
+        return;
+      }
       const found = parsed.find((d) => d.id === targetId) ?? null;
       setDoc(found);
     } catch {
       setDoc(null);
     }
-  }, [id]);
+  }, [targetId]);
   const baseItems = useMemo<Item[]>(() => {
     const mapped = doc?.items?.map((item) => ({
       code: item?.Barcode || item?.ItemID || "-",

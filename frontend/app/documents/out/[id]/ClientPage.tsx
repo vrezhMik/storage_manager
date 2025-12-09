@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import ArrowUpFromLineIcon from "../../../UI/ArrowUpFromLineIcon";
 import CameraIcon from "../../../UI/CameraIcon";
 import MinusIcon from "../../../UI/MinusIcon";
@@ -47,6 +48,9 @@ const formatTransactionDate = (value?: string | null) => {
 
 export default function OutOrderDetail({ id }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlId = searchParams.get("id");
+  const targetId = id ?? urlId ?? undefined;
   const [hydrated, setHydrated] = useState(false);
   const [doc, setDoc] = useState<OrderDoc | null | undefined>(undefined);
   useEffect(() => {
@@ -58,13 +62,16 @@ export default function OutOrderDetail({ id }: Props) {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed: OrderDoc[] = JSON.parse(raw);
-      const targetId = id ?? parsed[0]?.id;
+      if (!targetId) {
+        setDoc(null);
+        return;
+      }
       const found = parsed.find((d) => d.id === targetId) ?? null;
       setDoc(found);
     } catch {
       setDoc(null);
     }
-  }, [id]);
+  }, [targetId]);
   const canManual = useMemo(() => {
     if (typeof window === "undefined") return true;
     const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
