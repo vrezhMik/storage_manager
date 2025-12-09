@@ -11,7 +11,11 @@ import SaveIcon from "../../../UI/SaveIcon";
 import SendIcon from "../../../UI/SendIcon";
 import ScanIcon from "../../../UI/ScanIcon";
 import AuthGuard from "../../../components/AuthGuard";
-import { USER_MANUAL_ALLOWED_KEY, API_BASE } from "../../../lib/auth";
+import {
+  USER_MANUAL_ALLOWED_KEY,
+  API_BASE,
+  authFetch,
+} from "../../../lib/auth";
 import { OrderDoc } from "../page";
 
 const STORAGE_KEY = "orders-data";
@@ -27,6 +31,31 @@ type Item = {
   total: number;
   current: number;
   stock: number;
+};
+
+const mapDocId = (doc: any, idx: number) =>
+  String(
+    doc?.Number ??
+      doc?.DocEntry ??
+      doc?.DocumentID ??
+      doc?.DocumentId ??
+      doc?.ID ??
+      doc?.Id ??
+      doc?.DocNum ??
+      doc?.Guid ??
+      idx,
+  );
+
+const mapApiDocs = (data: any): OrderDoc[] => {
+  const docs = Array.isArray(data?.Documents) ? data.Documents : [];
+  return docs.map((doc: any, idx: number) => ({
+    id: mapDocId(doc, idx),
+    date: (doc?.Date ?? "").split("T")[0] || "",
+    transactionDate: doc?.Date ?? "",
+    title: doc?.ClientName ?? "",
+    clientId: doc?.ClientID ?? "",
+    items: Array.isArray(doc?.Items) ? doc.Items : [],
+  }));
 };
 
 const formatTransactionDate = (value?: string | null) => {
@@ -56,19 +85,64 @@ export default function OutOrderDetail({ id }: Props) {
   }, []);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed: OrderDoc[] = JSON.parse(raw);
+    const controller = new AbortController();
+    let active = true;
+
+    const fromCache = (): OrderDoc | null => {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) return null;
+        const parsed: OrderDoc[] = JSON.parse(raw);
+        return (
+          parsed.find((d) => normalizeId(d.id) === targetId) ?? null
+        );
+      } catch {
+        return null;
+      }
+    };
+
+    const cachedDoc = targetId ? fromCache() : null;
+    setDoc(cachedDoc ?? undefined);
+
+    const fetchFresh = async () => {
       if (!targetId) {
         setDoc(null);
         return;
       }
-      const found = parsed.find((d) => normalizeId(d.id) === targetId) ?? null;
-      setDoc(found);
-    } catch {
-      setDoc(null);
+      try {
+        const res = await authFetch(`${API_BASE}/orders`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          throw new Error(`Failed to load (${res.status})`);
+        }
+        const text = await res.text();
+        const data = JSON.parse(text);
+        const mapped = mapApiDocs(data);
+        if (!active) return;
+        const found = mapped.find(
+          (d) => normalizeId(d.id) === targetId,
+        ) ?? null;
+        setDoc(found);
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        } catch {
+          // ignore storage errors
+        }
+      } catch (err) {
+        if (!active || controller.signal.aborted) return;
+        setDoc((prev) => (prev === undefined ? null : prev));
+      }
+    };
+
+    if (!cachedDoc) {
+      fetchFresh();
     }
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [targetId]);
   const canManual = useMemo(() => {
     if (typeof window === "undefined") return true;

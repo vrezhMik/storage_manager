@@ -1,15 +1,10 @@
+"use client";
+
+import { useSearchParams } from "next/navigation";
 import ClientPage from "../[id]/ClientPage";
 
-type SearchParams = { id?: string | string[] };
-
-export const dynamic = "force-dynamic";
-
-export default function Page({
-  searchParams,
-}: {
-  searchParams?: SearchParams;
-}) {
-  const idParam = searchParams?.id;
-  const id = Array.isArray(idParam) ? idParam[0] : idParam;
+export default function Page() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") || undefined;
   return <ClientPage id={id} />;
 }
