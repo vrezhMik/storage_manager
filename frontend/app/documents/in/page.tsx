@@ -10,6 +10,19 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||
   "http://127.0.0.1:8000/api";
 
+const mapDocId = (doc: any, idx: number) =>
+  String(
+    doc?.Number ??
+      doc?.DocEntry ??
+      doc?.DocumentID ??
+      doc?.DocumentId ??
+      doc?.ID ??
+      doc?.Id ??
+      doc?.DocNum ??
+      doc?.Guid ??
+      idx
+  );
+
 export type PurchaseDoc = {
   id: string;
   date: string;
@@ -71,8 +84,8 @@ export default function DocumentsInPage() {
         const text = await res.text();
         const data = JSON.parse(text);
         const mapped: PurchaseDoc[] = Array.isArray(data?.Documents)
-          ? data.Documents.map((doc: any) => ({
-              id: doc?.Number ?? "-",
+          ? data.Documents.map((doc: any, idx: number) => ({
+              id: mapDocId(doc, idx),
               date: (doc?.Date ?? "").split("T")[0] || "",
               transactionDate: doc?.Date ?? "",
               title: doc?.ClientName ?? "",

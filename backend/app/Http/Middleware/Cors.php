@@ -11,7 +11,7 @@ class Cors
     public function handle(Request $request, Closure $next): Response
     {
         $origin = $request->headers->get('Origin');
-        $defaultOrigins = 'http://localhost:3000,http://127.0.0.1:3000';
+        $defaultOrigins = 'http://localhost:3000,http://127.0.0.1:3000,https://terminal.flexit.am,https://admin.flexit.am';
         $allowedOrigins = collect(explode(',', (string) env('ALLOWED_ORIGINS', $defaultOrigins)))
             ->map(fn ($o) => trim($o))
             ->filter()
