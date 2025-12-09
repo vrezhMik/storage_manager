@@ -130,22 +130,20 @@ export default function OutOrderDetail({ id }: Props) {
       controller.abort();
     };
   }, [targetId]);
-  const canManual = useMemo(() => {
-    if (typeof window === "undefined") return true;
-    const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
-    return stored !== "false";
-  }, []);
-  const canManualTextInput = useMemo(() => {
-    if (typeof window === "undefined") return true;
-    const stored =
+  const [canManual, setCanManual] = useState(true);
+  const [canManualTextInput, setCanManualTextInput] = useState(true);
+  const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedManual = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
+    const storedText =
       window.localStorage.getItem(USER_MANUAL_TEXT_ALLOWED_KEY);
-    return stored !== "false";
+    setCanManual(storedManual !== "false");
+    setCanManualTextInput(storedText !== "false");
+    if (storedManual === "false") {
+      setTab("device");
+    }
   }, []);
-  const [tab, setTab] = useState<"manual" | "camera" | "device">(() => {
-    if (typeof window === "undefined") return "manual";
-    const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
-    return stored === "false" ? "device" : "manual";
-  });
   const baseItems = useMemo<Item[]>(() => {
     const mapped = doc?.items?.map((item) => ({
       code: item?.Barcode || item?.ItemID || "-",

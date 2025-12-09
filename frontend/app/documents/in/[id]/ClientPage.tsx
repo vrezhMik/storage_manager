@@ -148,22 +148,20 @@ export default function InOrderDetail({ id }: Props) {
     }));
     return mapped && mapped.length > 0 ? mapped : [];
   }, [doc]);
-  const canManual = useMemo(() => {
-    if (typeof window === "undefined") return true;
-    const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
-    return stored !== "false";
-  }, []);
-  const canManualTextInput = useMemo(() => {
-    if (typeof window === "undefined") return true;
-    const stored =
+  const [canManual, setCanManual] = useState(true);
+  const [canManualTextInput, setCanManualTextInput] = useState(true);
+  const [tab, setTab] = useState<"manual" | "camera" | "device">("manual");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedManual = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
+    const storedText =
       window.localStorage.getItem(USER_MANUAL_TEXT_ALLOWED_KEY);
-    return stored !== "false";
+    setCanManual(storedManual !== "false");
+    setCanManualTextInput(storedText !== "false");
+    if (storedManual === "false") {
+      setTab("device");
+    }
   }, []);
-  const [tab, setTab] = useState<"manual" | "camera" | "device">(() => {
-    if (typeof window === "undefined") return "manual";
-    const stored = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
-    return stored === "false" ? "device" : "manual";
-  });
   const [manualCode, setManualCode] = useState("");
   const [manualError, setManualError] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>(baseItems);

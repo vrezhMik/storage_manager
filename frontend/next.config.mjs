@@ -7,12 +7,9 @@ const basePath = repoBasePath
   ? `/${repoBasePath.replace(/^\/+|\/+$/g, "")}`
   : "";
 
-// Allow disabling static export for dynamic data (e.g., external API-driven routes)
-const shouldExport = process.env.NEXT_PUBLIC_OUTPUT === "export";
-
 const nextConfig = {
   reactStrictMode: true,
-  output: shouldExport ? "export" : undefined,
+  output: "export",
   basePath: basePath || undefined,
   assetPrefix: basePath ? `${basePath}/` : undefined,
   experimental: {
