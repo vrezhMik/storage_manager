@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import ClientPage from "../[id]/ClientPage";
@@ -19,4 +18,4 @@ function Page() {
   );
 }
 
-export default dynamic(() => Promise.resolve(Page), { ssr: false });
+export default Page;

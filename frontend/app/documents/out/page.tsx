@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import DocumentList from "../components/DocumentList";
@@ -153,4 +152,4 @@ function DocumentsOutPage() {
   );
 }
 
-export default dynamic(() => Promise.resolve(DocumentsOutPage), { ssr: false });
+export default DocumentsOutPage;

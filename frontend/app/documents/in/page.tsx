@@ -1,6 +1,5 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import DocumentList from "../components/DocumentList";
@@ -157,4 +156,4 @@ function DocumentsInPage() {
   );
 }
 
-export default dynamic(() => Promise.resolve(DocumentsInPage), { ssr: false });
+export default DocumentsInPage;
