@@ -45,7 +45,7 @@ const mapDocId = (doc: any, idx: number) =>
       doc?.Id ??
       doc?.DocNum ??
       doc?.Guid ??
-      idx,
+      idx
   );
 
 const mapApiDocs = (data: any): OrderDoc[] => {
@@ -62,7 +62,8 @@ const mapApiDocs = (data: any): OrderDoc[] => {
 
 export default function OutOrderDetail({ id }: Props) {
   const router = useRouter();
-  const normalizeId = (value: string | null | undefined) => (value ?? "").trim();
+  const normalizeId = (value: string | null | undefined) =>
+    (value ?? "").trim();
   const targetId = normalizeId(id);
   const [hydrated, setHydrated] = useState(false);
   const [doc, setDoc] = useState<OrderDoc | null | undefined>(undefined);
@@ -79,9 +80,7 @@ export default function OutOrderDetail({ id }: Props) {
         const raw = window.localStorage.getItem(STORAGE_KEY);
         if (!raw) return null;
         const parsed: OrderDoc[] = JSON.parse(raw);
-        return (
-          parsed.find((d) => normalizeId(d.id) === targetId) ?? null
-        );
+        return parsed.find((d) => normalizeId(d.id) === targetId) ?? null;
       } catch {
         return null;
       }
@@ -101,9 +100,8 @@ export default function OutOrderDetail({ id }: Props) {
         });
         const mapped = mapApiDocs(data);
         if (!active) return;
-        const found = mapped.find(
-          (d) => normalizeId(d.id) === targetId,
-        ) ?? null;
+        const found =
+          mapped.find((d) => normalizeId(d.id) === targetId) ?? null;
         setDoc(found);
         try {
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
@@ -131,8 +129,9 @@ export default function OutOrderDetail({ id }: Props) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const storedManual = window.localStorage.getItem(USER_MANUAL_ALLOWED_KEY);
-    const storedText =
-      window.localStorage.getItem(USER_MANUAL_TEXT_ALLOWED_KEY);
+    const storedText = window.localStorage.getItem(
+      USER_MANUAL_TEXT_ALLOWED_KEY
+    );
     setCanManual(storedManual !== "false");
     setCanManualTextInput(storedText !== "false");
     if (storedManual === "false") {
@@ -180,7 +179,7 @@ export default function OutOrderDetail({ id }: Props) {
   const deviceIdleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const storageKey = useMemo(
     () => `out-order-${targetId || "default"}`,
-    [targetId],
+    [targetId]
   );
   const hasBarcode = Boolean(barcode);
 
@@ -240,8 +239,12 @@ export default function OutOrderDetail({ id }: Props) {
     if (target) {
       target.scrollIntoView({ behavior: "smooth", block: "center" });
       setHighlighted(code);
-      if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
-      highlightTimeoutRef.current = setTimeout(() => setHighlighted(null), 1200);
+      if (highlightTimeoutRef.current)
+        clearTimeout(highlightTimeoutRef.current);
+      highlightTimeoutRef.current = setTimeout(
+        () => setHighlighted(null),
+        1200
+      );
     }
   }, []);
 
@@ -250,7 +253,8 @@ export default function OutOrderDetail({ id }: Props) {
       const updated = prev.map((item) => {
         if (item.code !== code) return item;
         const increment = delta > 0 ? delta : 0;
-        const decrement = delta < 0 ? Math.min(Math.abs(delta), item.current) : 0;
+        const decrement =
+          delta < 0 ? Math.min(Math.abs(delta), item.current) : 0;
         const nextCurrent = Math.max(0, item.current + increment - decrement);
         const nextStock =
           typeof item.stock === "number"
@@ -268,9 +272,8 @@ export default function OutOrderDetail({ id }: Props) {
       const code = rawCode.trim();
       if (!code) return;
       const match =
-        itemsRef.current.find(
-          (i) => i.code === code || i.itemId === code,
-        ) || null;
+        itemsRef.current.find((i) => i.code === code || i.itemId === code) ||
+        null;
       if (match) {
         setManualError(null);
         focusItem(match.code);
@@ -281,7 +284,7 @@ export default function OutOrderDetail({ id }: Props) {
         setManualCode("");
       }
     },
-    [focusItem, updateItem],
+    [focusItem, updateItem]
   );
 
   useEffect(() => {
@@ -314,7 +317,8 @@ export default function OutOrderDetail({ id }: Props) {
           deviceBufferRef.current = "";
         }, 600);
         // also flush if user pauses typing (helps slow virtual scanners)
-        if (deviceIdleTimeoutRef.current) clearTimeout(deviceIdleTimeoutRef.current);
+        if (deviceIdleTimeoutRef.current)
+          clearTimeout(deviceIdleTimeoutRef.current);
         deviceIdleTimeoutRef.current = setTimeout(() => {
           const buffered = deviceBufferRef.current;
           deviceBufferRef.current = "";
@@ -326,7 +330,8 @@ export default function OutOrderDetail({ id }: Props) {
     return () => {
       window.removeEventListener("keydown", onKey);
       if (deviceTimeoutRef.current) clearTimeout(deviceTimeoutRef.current);
-      if (deviceIdleTimeoutRef.current) clearTimeout(deviceIdleTimeoutRef.current);
+      if (deviceIdleTimeoutRef.current)
+        clearTimeout(deviceIdleTimeoutRef.current);
     };
   }, [tab, processCode]);
 
@@ -352,22 +357,22 @@ export default function OutOrderDetail({ id }: Props) {
       }
       return baseItems;
     },
-    [baseItems],
+    [baseItems]
   );
 
   const notFound = hydrated && doc === null;
 
-const statusColorClass = (current: number, total: number) => {
-  if (current < total) return "text-muted-foreground";
-  if (current === total) return "text-[hsl(var(--success))]";
-  return "text-[hsl(var(--destructive))]";
-};
+  const statusColorClass = (current: number, total: number) => {
+    if (current < total) return "text-muted-foreground";
+    if (current === total) return "text-[hsl(var(--success))]";
+    return "text-[hsl(var(--destructive))]";
+  };
 
-const statusBgClass = (current: number, total: number) => {
-  if (current > total) return "bg-red-100";
-  if (current === total) return "bg-green-100";
-  return "bg-gray-100";
-};
+  const statusBgClass = (current: number, total: number) => {
+    if (current > total) return "bg-red-100";
+    if (current === total) return "bg-green-100";
+    return "bg-gray-100";
+  };
 
   useEffect(() => {
     // hydrate from localStorage if present
@@ -414,8 +419,12 @@ const statusBgClass = (current: number, total: number) => {
         setScanError(null);
         updateItem(code, 1);
         setHighlighted(code);
-        if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current);
-        highlightTimeoutRef.current = setTimeout(() => setHighlighted(null), 1200);
+        if (highlightTimeoutRef.current)
+          clearTimeout(highlightTimeoutRef.current);
+        highlightTimeoutRef.current = setTimeout(
+          () => setHighlighted(null),
+          1200
+        );
         const target = itemRefs.current[code];
         if (target) {
           target.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -432,7 +441,8 @@ const statusBgClass = (current: number, total: number) => {
 
     const startCamera = async () => {
       if (streamRef.current) return;
-      const hasDetector = typeof window !== "undefined" && "BarcodeDetector" in window;
+      const hasDetector =
+        typeof window !== "undefined" && "BarcodeDetector" in window;
 
       const requestStream = async () => {
         try {
@@ -458,7 +468,9 @@ const statusBgClass = (current: number, total: number) => {
         }
       } catch (err) {
         console.error("Camera start failed", err);
-        setScanError("Տեսախցիկը չի միանում․ թույլատրեք հասանելիությունը և փորձեք կրկին");
+        setScanError(
+          "Տեսախցիկը չի միանում․ թույլատրեք հասանելիությունը և փորձեք կրկին"
+        );
       }
     };
 
@@ -572,7 +584,10 @@ const statusBgClass = (current: number, total: number) => {
       <div className="rounded-xl border bg-card text-card-foreground shadow">
         <div className="p-6 space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="space-y-3 border-b border-border pb-3 last:border-0 last:pb-0">
+            <div
+              key={i}
+              className="space-y-3 border-b border-border pb-3 last:border-0 last:pb-0"
+            >
               <div className="flex justify-between gap-3">
                 <div className="flex-1 space-y-2">
                   <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
@@ -592,7 +607,9 @@ const statusBgClass = (current: number, total: number) => {
     <div className="space-y-4">
       <div className="rounded-xl border bg-card text-card-foreground shadow">
         <div className="p-6 pt-6 text-center space-y-3">
-          <h1 className="text-xl font-semibold text-foreground">Փաստաթուղթը չի գտնվել</h1>
+          <h1 className="text-xl font-semibold text-foreground">
+            Փաստաթուղթը չի գտնվել
+          </h1>
           <p className="text-muted-foreground text-sm">
             Վերադարձեք Ելքերի ցուցակ և ընտրեք փաստաթուղթը նորից։
           </p>
@@ -610,240 +627,263 @@ const statusBgClass = (current: number, total: number) => {
   const renderContent = () => {
     return (
       <div className="space-y-4">
-      <div className="rounded-xl border bg-card text-card-foreground shadow">
-        <div className="p-6 pt-6">
-          <div dir="ltr" data-orientation="horizontal" className="w-full">
-            <div
-              role="tablist"
-              aria-orientation="horizontal"
-              className={`h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full ${canManual ? "grid-cols-3" : "grid-cols-2"}`}
-            >
-              {canManual && (
+        <div className="rounded-xl border bg-card text-card-foreground shadow">
+          <div className="p-6 pt-6">
+            <div dir="ltr" data-orientation="horizontal" className="w-full">
+              <div
+                role="tablist"
+                aria-orientation="horizontal"
+                className={`h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground grid w-full ${
+                  canManual ? "grid-cols-3" : "grid-cols-2"
+                }`}
+              >
+                {canManual && (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === "manual"}
+                    data-state={tab === "manual" ? "active" : "inactive"}
+                    onClick={() => setTab("manual")}
+                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
+                  >
+                    <PlusIcon className="h-3.5 w-3.5 mr-1" />
+                    Ձեռքով
+                  </button>
+                )}
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={tab === "manual"}
-                  data-state={tab === "manual" ? "active" : "inactive"}
-                  onClick={() => setTab("manual")}
+                  aria-selected={tab === "camera"}
+                  data-state={tab === "camera" ? "active" : "inactive"}
+                  onClick={() => setTab("camera")}
                   className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
                 >
-                  <PlusIcon className="h-3.5 w-3.5 mr-1" />
-                  Ձեռքով
+                  <CameraIcon className="h-3.5 w-3.5 mr-1" />
+                  Տեսախցիկ
                 </button>
-              )}
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === "camera"}
-                data-state={tab === "camera" ? "active" : "inactive"}
-                onClick={() => setTab("camera")}
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
-              >
-                <CameraIcon className="h-3.5 w-3.5 mr-1" />
-                Տեսախցիկ
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === "device"}
-                data-state={tab === "device" ? "active" : "inactive"}
-                onClick={() => setTab("device")}
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
-              >
-                <ScanIcon className="h-3.5 w-3.5 mr-1" />
-                Սարք
-              </button>
-            </div>
-            {canManualTextInput && (
-              <>
-                <form
-                  className="mt-3 flex gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    processCode(manualCode);
-                    if (tab === "device") {
-                      setTimeout(() => manualInputRef.current?.focus(), 0);
-                    } else if (canManual) {
-                      setTab("manual");
-                    }
-                  }}
-                >
-                  <input
-                    ref={manualInputRef}
-                    className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    placeholder={
-                      tab === "device" ? "Սկանավորեք սարքով" : "Մուտքագրեք բարկոդը"
-                    }
-                    autoFocus={tab === "device"}
-                    value={manualCode}
-                    onChange={(e) => setManualCode(e.target.value)}
-                  />
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90"
-                  >
-                    Գտնել
-                  </button>
-                </form>
-                {manualError && (
-                  <p className="mt-2 text-xs text-red-600">{manualError}</p>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border bg-card text-card-foreground shadow">
-        <div className="flex flex-col space-y-1.5 p-6 pb-3">
-          <div className="font-semibold tracking-tight text-base">
-            Ապրանքներ
-          </div>
-        </div>
-        <div className="p-0 space-y-0">
-          {tab === "camera" && (
-            <div className="sticky top-0 z-50 relative border-b border-border bg-black text-white">
-              <div className="flex items-center justify-center gap-2 px-4 py-3 bg-black/70">
                 <button
                   type="button"
-                  onClick={() => setCameraActive((v) => !v)}
-                  className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-black shadow transition hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-yellow-400"
+                  role="tab"
+                  aria-selected={tab === "device"}
+                  data-state={tab === "device" ? "active" : "inactive"}
+                  onClick={() => setTab("device")}
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow text-xs"
                 >
-                  <CameraIcon className="h-4 w-4" />
-                  {cameraActive ? "Անջատել" : "Միացնել տեսախցիկը"}
+                  <ScanIcon className="h-3.5 w-3.5 mr-1" />
+                  Սարք
                 </button>
               </div>
-              {cameraActive ? (
+              {canManualTextInput && (
                 <>
-                  <video
-                    ref={videoRef}
-                    className="w-full rounded-b-xl aspect-video object-cover bg-black"
-                    playsInline
-                    autoPlay
-                    muted
-                  />
-                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div
-                      className={`h-40 w-64 rounded-md border-2 transition-colors duration-150 ${
-                        hasBarcode
-                          ? "border-green-400 shadow-[0_0_0_2px_rgba(34,197,94,0.35)]"
-                          : "border-yellow-400 shadow-[0_0_0_2px_rgba(250,204,21,0.35)]"
-                      }`}
+                  <form
+                    className="mt-3 flex gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      processCode(manualCode);
+                      if (tab === "device") {
+                        setTimeout(() => manualInputRef.current?.focus(), 0);
+                      } else if (canManual) {
+                        setTab("manual");
+                      }
+                    }}
+                  >
+                    <input
+                      ref={manualInputRef}
+                      className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      placeholder={
+                        tab === "device"
+                          ? "Սկանավորեք սարքով"
+                          : "Մուտքագրեք բարկոդը"
+                      }
+                      autoFocus={tab === "device"}
+                      value={manualCode}
+                      onChange={(e) => setManualCode(e.target.value)}
                     />
-                  </div>
+                    <button
+                      type="submit"
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90"
+                    >
+                      Գտնել
+                    </button>
+                  </form>
+                  {manualError && (
+                    <p className="mt-2 text-xs text-red-600">{manualError}</p>
+                  )}
                 </>
-              ) : (
-                <div className="w-full rounded-b-xl bg-black/80 aspect-video flex items-center justify-center text-xs text-white/70">
-                  Սկսեք սկանավորումը
-                </div>
               )}
-              <div className="px-4 py-2 text-xs text-white/80 flex justify-between">
-                <span>{barcode ? `Գտնված բարկոդը: ${barcode}` : cameraActive ? "Սկանավորում..." : "Տեսախցիկը անջատված է"}</span>
-                {scanError && <span className="text-red-400">{scanError}</span>}
-              </div>
             </div>
-          )}
-          <div className="space-y-0">
-            {items.map((item) => (
-              <div
-                key={item.code}
-                ref={(el) => {
-                  itemRefs.current[item.code] = el;
-                }}
-                className={`p-4 space-y-3 border-b border-border last:border-none ${statusBgClass(
-                  item.current,
-                  item.total,
-                )} ${highlighted === item.code ? "ring-2 ring-success-light/40" : ""}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-foreground">
-                      {item.name || item.itemId || "Անվանում չկա"}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
-                    <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-muted text-muted-foreground border-border shrink-0">
-                      <span className={statusColorClass(item.current, item.total)}>
-                        {item.current}/{item.total}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span>Կոդ: {item.itemId || item.code}</span>
-                  {item.barcode ? (
-                    <>
-                      <span>•</span>
-                      <span>Բարկոդ: {item.barcode}</span>
-                    </>
-                  ) : null}
-                  {item.location ? (
-                    <>
-                      <span>•</span>
-                      <span>Հասցե: {item.location}</span>
-                    </>
-                  ) : null}
-                  {item.articul ? (
-                    <>
-                      <span>•</span>
-                      <span>Արտիկուլ: {item.articul}</span>
-                    </>
-                  ) : null}
-                </div>
-                {tab === "manual" ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-                      onClick={() => updateItem(item.code, -1)}
-                      disabled={!canManual}
-                    >
-                      <MinusIcon className="h-4 w-4" />
-                    </button>
-                    <div className="flex-1 text-center">
-                      <span className={`text-lg font-semibold ${statusColorClass(item.current, item.total)}`}>
-                        {item.current}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {" "}
-                        / {item.total}
-                      </span>
-                    </div>
-                    <button
-                      className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
-                      onClick={() => updateItem(item.code, 1)}
-                      disabled={!canManual}
-                    >
-                      <PlusIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center text-sm text-muted-foreground">
-                    {item.current} / {item.total}
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-3 pt-2">
-        <button
-          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 h-12"
-          onClick={handleSave}
-        >
-          <SaveIcon className="mr-2 h-4 w-4" />
-          Պահպանել
-        </button>
-        <button
-          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-[#015433]/90 px-4 py-2 h-12"
-          onClick={handleSend}
-          disabled={sendLoading}
-        >
-          <SendIcon className="mr-2 h-4 w-4" />
-          {sendLoading ? "Ուղարկվում է..." : "Ուղարկել 1C"}
-        </button>
-      </div>
+        <div className="rounded-xl border bg-card text-card-foreground shadow">
+          <div className="flex flex-col space-y-1.5 p-6 pb-3">
+            <div className="font-semibold tracking-tight text-base">
+              Ապրանքներ
+            </div>
+          </div>
+          <div className="p-0 space-y-0">
+            {tab === "camera" && (
+              <div className="sticky top-0 z-50 relative border-b border-border bg-black text-white">
+                <div className="flex items-center justify-center gap-2 px-4 py-3 bg-black/70">
+                  <button
+                    type="button"
+                    onClick={() => setCameraActive((v) => !v)}
+                    className="inline-flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-black shadow transition hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-yellow-400"
+                  >
+                    <CameraIcon className="h-4 w-4" />
+                    {cameraActive ? "Անջատել" : "Միացնել տեսախցիկը"}
+                  </button>
+                </div>
+                {cameraActive ? (
+                  <>
+                    <video
+                      ref={videoRef}
+                      className="w-full rounded-b-xl aspect-video object-cover bg-black"
+                      playsInline
+                      autoPlay
+                      muted
+                    />
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <div
+                        className={`h-40 w-64 rounded-md border-2 transition-colors duration-150 ${
+                          hasBarcode
+                            ? "border-green-400 shadow-[0_0_0_2px_rgba(34,197,94,0.35)]"
+                            : "border-yellow-400 shadow-[0_0_0_2px_rgba(250,204,21,0.35)]"
+                        }`}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full rounded-b-xl bg-black/80 aspect-video flex items-center justify-center text-xs text-white/70">
+                    Սկսեք սկանավորումը
+                  </div>
+                )}
+                <div className="px-4 py-2 text-xs text-white/80 flex justify-between">
+                  <span>
+                    {barcode
+                      ? `Գտնված բարկոդը: ${barcode}`
+                      : cameraActive
+                      ? "Սկանավորում..."
+                      : "Տեսախցիկը անջատված է"}
+                  </span>
+                  {scanError && (
+                    <span className="text-red-400">{scanError}</span>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="space-y-0">
+              {items.map((item) => (
+                <div
+                  key={item.code}
+                  ref={(el) => {
+                    itemRefs.current[item.code] = el;
+                  }}
+                  className={`p-4 space-y-3 border-b border-border last:border-none !mb-[2px] ${statusBgClass(
+                    item.current,
+                    item.total
+                  )} ${
+                    highlighted === item.code
+                      ? "ring-2 ring-success-light/40"
+                      : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-foreground">
+                        {item.name || item.itemId || "Անվանում չկա"}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
+                      <div className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-muted text-muted-foreground border-border shrink-0">
+                        <span
+                          className={statusColorClass(item.current, item.total)}
+                        >
+                          {item.current}/{item.total}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                    <span>Կոդ: {item.itemId || item.code}</span>
+                    {item.barcode ? (
+                      <>
+                        <span>•</span>
+                        <span>Բարկոդ: {item.barcode}</span>
+                      </>
+                    ) : null}
+                    {item.location ? (
+                      <>
+                        <span>•</span>
+                        <span>Հասցե: {item.location}</span>
+                      </>
+                    ) : null}
+                    {item.articul ? (
+                      <>
+                        <span>•</span>
+                        <span>Արտիկուլ: {item.articul}</span>
+                      </>
+                    ) : null}
+                  </div>
+                  {tab === "manual" ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
+                        onClick={() => updateItem(item.code, -1)}
+                        disabled={!canManual}
+                      >
+                        <MinusIcon className="h-4 w-4" />
+                      </button>
+                      <div className="flex-1 text-center">
+                        <span
+                          className={`text-lg font-semibold ${statusColorClass(
+                            item.current,
+                            item.total
+                          )}`}
+                        >
+                          {item.current}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {" "}
+                          / {item.total}
+                        </span>
+                      </div>
+                      <button
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground rounded-md text-xs h-9 w-9 p-0"
+                        onClick={() => updateItem(item.code, 1)}
+                        disabled={!canManual}
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center text-sm text-muted-foreground">
+                      {item.current} / {item.total}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <button
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input shadow-sm hover:bg-accent hover:text-accent-foreground px-4 py-2 h-12"
+            onClick={handleSave}
+          >
+            <SaveIcon className="mr-2 h-4 w-4" />
+            Պահպանել
+          </button>
+          <button
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 bg-primary text-primary-foreground shadow hover:bg-[#015433]/90 px-4 py-2 h-12"
+            onClick={handleSend}
+            disabled={sendLoading}
+          >
+            <SendIcon className="mr-2 h-4 w-4" />
+            {sendLoading ? "Ուղարկվում է..." : "Ուղարկել 1C"}
+          </button>
+        </div>
         {sendError && (
           <div className="mt-3 text-sm text-red-600">{sendError}</div>
         )}
@@ -858,8 +898,8 @@ const statusBgClass = (current: number, total: number) => {
           {!hydrated || doc === undefined
             ? renderSkeleton()
             : notFound
-              ? renderNotFound()
-              : renderContent()}
+            ? renderNotFound()
+            : renderContent()}
         </main>
       </div>
       <section
