@@ -7,6 +7,13 @@ const SingleOutPageClient = dynamic(
   },
 );
 
+
+import { Suspense } from "react";
+
 export default function Page() {
-  return <SingleOutPageClient />;
+  return (
+    <Suspense fallback={null}>
+      <SingleOutPageClient />
+    </Suspense>
+  );
 }
