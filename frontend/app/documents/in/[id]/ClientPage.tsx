@@ -37,7 +37,8 @@ type Item = {
 export default function InOrderDetail({ id }: Props) {
   const searchParams = useSearchParams();
   const urlId = searchParams.get("id");
-  const targetId = id ?? urlId ?? undefined;
+  const normalizeId = (value: string | null | undefined) => (value ?? "").trim();
+  const targetId = normalizeId(id ?? urlId);
   const [doc, setDoc] = useState<PurchaseDoc | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
@@ -51,7 +52,7 @@ export default function InOrderDetail({ id }: Props) {
         setDoc(null);
         return;
       }
-      const found = parsed.find((d) => d.id === targetId) ?? null;
+      const found = parsed.find((d) => normalizeId(d.id) === targetId) ?? null;
       setDoc(found);
     } catch {
       setDoc(null);
@@ -103,7 +104,10 @@ export default function InOrderDetail({ id }: Props) {
   const deviceBufferRef = useRef<string>("");
   const deviceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const deviceIdleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const storageKey = useMemo(() => `in-order-${id ?? "default"}`, [id]);
+  const storageKey = useMemo(
+    () => `in-order-${targetId || "default"}`,
+    [targetId],
+  );
   const hasBarcode = Boolean(barcode);
 
   useEffect(() => {

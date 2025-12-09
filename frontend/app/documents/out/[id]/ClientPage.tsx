@@ -50,7 +50,8 @@ export default function OutOrderDetail({ id }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlId = searchParams.get("id");
-  const targetId = id ?? urlId ?? undefined;
+  const normalizeId = (value: string | null | undefined) => (value ?? "").trim();
+  const targetId = normalizeId(id ?? urlId);
   const [hydrated, setHydrated] = useState(false);
   const [doc, setDoc] = useState<OrderDoc | null | undefined>(undefined);
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function OutOrderDetail({ id }: Props) {
         setDoc(null);
         return;
       }
-      const found = parsed.find((d) => d.id === targetId) ?? null;
+      const found = parsed.find((d) => normalizeId(d.id) === targetId) ?? null;
       setDoc(found);
     } catch {
       setDoc(null);
@@ -120,7 +121,10 @@ export default function OutOrderDetail({ id }: Props) {
   const deviceBufferRef = useRef<string>("");
   const deviceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const deviceIdleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const storageKey = useMemo(() => `out-order-${id ?? "default"}`, [id]);
+  const storageKey = useMemo(
+    () => `out-order-${targetId || "default"}`,
+    [targetId],
+  );
   const hasBarcode = Boolean(barcode);
 
   const handleSend = async () => {
