@@ -6,7 +6,7 @@ import { storeAuthTokens, clearAuthStorage, authFetch } from "../lib/auth";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||
-  "http://127.0.0.1:8000/api";
+  "https://admin.flexit.am/api";
 
 export default function LoginPage() {
   const router = useRouter();

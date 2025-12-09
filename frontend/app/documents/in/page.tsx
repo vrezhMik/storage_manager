@@ -8,7 +8,7 @@ import { authFetch, USER_MANUAL_ALLOWED_KEY } from "../../lib/auth";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||
-  "http://127.0.0.1:8000/api";
+  "https://admin.flexit.am/api";
 
 const mapDocId = (doc: any, idx: number) =>
   String(
