@@ -28,6 +28,7 @@ type Props = { id?: string };
 
 type Item = {
   code: string;
+  barcode: string;
   name: string;
   itemId: string;
   articul: string;
@@ -135,6 +136,7 @@ export default function InOrderDetail({ id }: Props) {
   const baseItems = useMemo<Item[]>(() => {
     const mapped = doc?.items?.map((item) => ({
       code: item?.Barcode || item?.ItemID || "-",
+      barcode: item?.Barcode || "",
       name: item?.Name || item?.ItemID || "",
       itemId: item?.ItemID || "",
       articul: item?.Articul || "",
@@ -299,6 +301,7 @@ export default function InOrderDetail({ id }: Props) {
           const base = key ? lookup.get(key) : undefined;
           return {
             ...s,
+            barcode: s.barcode || base?.barcode || "",
             name: s.name || base?.name || "",
             itemId: s.itemId || base?.itemId || "",
             articul: s.articul || base?.articul || "",
@@ -506,29 +509,13 @@ export default function InOrderDetail({ id }: Props) {
     window.localStorage.setItem(storageKey, JSON.stringify(itemsRef.current));
   };
 
-  const formatTransactionDate = (value?: string | null) => {
-    if (!value) return undefined;
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return value;
-    }
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    const day = pad(parsed.getDate());
-    const month = pad(parsed.getMonth() + 1);
-    const year = parsed.getFullYear();
-    const hours = pad(parsed.getHours());
-    const minutes = pad(parsed.getMinutes());
-    const seconds = pad(parsed.getSeconds());
-    return `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
-  };
-
   const handleSend = async () => {
     setSendError(null);
     if (!doc) return;
     const payload = {
       Number: doc.id,
       ClientID: doc.clientId ?? "",
-      TransactionDate: formatTransactionDate(doc.transactionDate || doc.date),
+      TransactionDate: doc.transactionDate || doc.date,
       Items: items
         .filter((i) => i.current > 0)
         .map((i) => ({
@@ -801,8 +788,12 @@ export default function InOrderDetail({ id }: Props) {
                       </div>
                       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                         <span>Կոդ: {item.itemId || item.code}</span>
-                        <span>•</span>
-                        <span>Բարկոդ: {item.code || "—"}</span>
+                        {item.barcode ? (
+                          <>
+                            <span>•</span>
+                            <span>Բարկոդ: {item.barcode}</span>
+                          </>
+                        ) : null}
                         {item.location ? (
                           <>
                             <span>•</span>
