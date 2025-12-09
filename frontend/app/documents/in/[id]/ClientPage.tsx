@@ -106,14 +106,9 @@ export default function InOrderDetail({ id }: Props) {
         return;
       }
       try {
-        const res = await authFetch(`${API_BASE}/purchases`, {
+        const data: any = await authFetch(`${API_BASE}/purchases`, {
           signal: controller.signal,
         });
-        if (!res.ok) {
-          throw new Error(`Failed to load (${res.status})`);
-        }
-        const text = await res.text();
-        const data = JSON.parse(text);
         const mapped = mapApiDocs(data);
         if (!active) return;
         const found = mapped.find(

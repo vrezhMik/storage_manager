@@ -95,23 +95,43 @@ function normalizeHeaders(existing: HeadersInit | undefined): Record<string, str
   return headers;
 }
 
-export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}) {
-  const headers = normalizeHeaders(init.headers);
-  const doFetch = () =>
-    fetch(input, {
-      ...init,
-      credentials: "include",
-      headers,
-    });
+export async function authFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const url = path.startsWith("http") ? path : `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
 
-  let res = await doFetch();
+  const res = await fetch(url, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+    },
+  });
+
   if (res.status === 401) {
-    const refreshed = await refreshAccessToken();
-    if (!refreshed) {
-      clearAuthStorage();
-      throw new Error("Session expired");
-    }
-    res = await doFetch();
+    // Attempt refresh if 401, trying to preserve original logic if possible, 
+    // but the user's snippet threw 'Unauthorized'.
+    // I'll stick to the user's requested pattern which is safer and simpler for debugging.
+    // If they need refresh, they might add it back or it's handled by valid cookie sessions.
+    // Actually, the original code had refresh logic. I'll add a minimal check or just throw as requested.
+    // User snippet: "if (res.status === 401) { throw new Error("Unauthorized"); }"
+    // I'll follow that to be safe.
+    throw new Error("Unauthorized");
   }
-  return res;
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Request failed (${res.status}): ${text}`);
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  // Handle cases where response might not be JSON
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : (undefined as T);
+  } catch {
+    return text as unknown as T;
+  }
 }

@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Inter } from "next/font/google";
+import { Inter } from "next/font/google"; // Adjusted to keep existing imports valid or assumed valid
 import "./globals.css";
-import TopBar from "./components/TopBar";
+import dynamic from "next/dynamic";
+
+const TopBar = dynamic(() => import("./components/TopBar"), { ssr: false });
 
 const inter = Inter({
   subsets: ["latin"],

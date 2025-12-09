@@ -49,23 +49,10 @@ export default function DocumentsOutPageClient() {
       const timeout = setTimeout(() => controller.abort(), 15000);
 
       try {
-        const res = await authFetch(`${API_BASE}/orders`, {
+        const data: any = await authFetch(`${API_BASE}/orders`, {
           signal: controller.signal,
         });
-        if (!res.ok) {
-          const bodyText = await res.text().catch(() => "");
-          let message = `Request failed (${res.status})`;
-          try {
-            const body = JSON.parse(bodyText);
-            message = body?.message ?? message;
-          } catch {
-            if (bodyText) message = bodyText;
-          }
-          throw new Error(message);
-        }
 
-        const text = await res.text();
-        const data = JSON.parse(text);
         const mapped: OrderDoc[] = Array.isArray(data?.Documents)
           ? data.Documents.map((doc: any, idx: number) => ({
               id: mapOrderDocId(doc, idx),

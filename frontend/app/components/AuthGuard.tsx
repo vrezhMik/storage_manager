@@ -25,14 +25,9 @@ export default function AuthGuard({ children }: Props) {
     hasCheckedOnce = true;
     const ensure = async () => {
       try {
-        const res = await authFetch(`${API_BASE}/auth/me`, { signal: controller.signal });
+        await authFetch(`${API_BASE}/auth/me`, { signal: controller.signal });
         if (!active) return;
-        if (!res.ok) {
-          clearAuthStorage();
-          lastAllowed = false;
-          router.replace("/login");
-          return;
-        }
+        
         lastAllowed = true;
         setAllowed(true);
       } catch (err: any) {
