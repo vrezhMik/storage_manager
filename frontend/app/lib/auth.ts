@@ -8,7 +8,7 @@ export const USER_MANUAL_TEXT_ALLOWED_KEY = "user_manual_text_allowed";
 const isBrowser = typeof window !== "undefined";
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, "") ||
-  "http://127.0.0.1:8000/api";
+  "https://admin.flexit.am/api";
 export { API_BASE };
 
 export function storeAuthTokens(data: {
