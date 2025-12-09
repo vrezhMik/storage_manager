@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import DocumentList from "../components/DocumentList";
@@ -34,7 +35,7 @@ export type OrderDoc = {
 
 const STORAGE_KEY = "orders-data";
 
-export default function DocumentsOutPage() {
+function DocumentsOutPage() {
   const router = useRouter();
   const [docs, setDocs] = useState<OrderDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,3 +152,5 @@ export default function DocumentsOutPage() {
     </AuthGuard>
   );
 }
+
+export default dynamic(() => Promise.resolve(DocumentsOutPage), { ssr: false });

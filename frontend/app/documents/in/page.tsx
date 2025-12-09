@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import DocumentList from "../components/DocumentList";
@@ -34,7 +35,7 @@ export type PurchaseDoc = {
 
 const STORAGE_KEY = "purchases-data";
 
-export default function DocumentsInPage() {
+function DocumentsInPage() {
   const router = useRouter();
   const [docs, setDocs] = useState<PurchaseDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,3 +156,5 @@ export default function DocumentsInPage() {
     </AuthGuard>
   );
 }
+
+export default dynamic(() => Promise.resolve(DocumentsInPage), { ssr: false });
