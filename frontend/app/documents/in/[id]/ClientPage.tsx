@@ -25,6 +25,12 @@ const statusColorClass = (current: number, total: number) => {
   return "text-[hsl(var(--destructive))]";
 };
 
+const statusBgClass = (current: number, total: number) => {
+  if (current > total) return "bg-destructive/20";
+  if (current === total) return "bg-success/20";
+  return "bg-muted/20";
+};
+
 type Props = { id?: string };
 
 type Item = {
@@ -772,9 +778,10 @@ export default function InOrderDetail({ id }: Props) {
                       ref={(el) => {
                         itemRefs.current[item.code] = el;
                       }}
-                      className={`p-4 space-y-3 border-b border-border last:border-none ${
-                        highlighted === item.code ? "bg-success-light/40" : ""
-                      }`}
+                      className={`p-4 space-y-3 border-b border-border last:border-none ${statusBgClass(
+                        item.current,
+                        item.total,
+                      )} ${highlighted === item.code ? "ring-2 ring-success-light/40" : ""}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
