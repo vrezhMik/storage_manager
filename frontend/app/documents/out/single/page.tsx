@@ -1,21 +1,12 @@
-"use client";
+import dynamic from "next/dynamic";
 
-import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import ClientPage from "../[id]/ClientPage";
+const SingleOutPageClient = dynamic(
+  () => import("./SingleOutPageClient"),
+  {
+    ssr: false,
+  },
+);
 
-function Content() {
-  const searchParams = useSearchParams();
-  const id = searchParams.get("id") || undefined;
-  return <ClientPage id={id} />;
+export default function Page() {
+  return <SingleOutPageClient />;
 }
-
-function Page() {
-  return (
-    <Suspense fallback={null}>
-      <Content />
-    </Suspense>
-  );
-}
-
-export default Page;

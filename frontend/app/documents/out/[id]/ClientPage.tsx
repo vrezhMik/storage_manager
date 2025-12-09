@@ -17,7 +17,7 @@ import {
   API_BASE,
   authFetch,
 } from "../../../lib/auth";
-import { OrderDoc } from "../page";
+import { OrderDoc } from "../types";
 
 const STORAGE_KEY = "orders-data";
 

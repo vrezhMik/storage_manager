@@ -15,7 +15,7 @@ import {
   API_BASE,
   authFetch,
 } from "../../../lib/auth";
-import { PurchaseDoc } from "../page";
+import { PurchaseDoc } from "../types";
 
 const STORAGE_KEY = "purchases-data";
 
