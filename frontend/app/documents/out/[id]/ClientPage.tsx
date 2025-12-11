@@ -364,9 +364,9 @@ const statusColorClass = (current: number, total: number) => {
 };
 
 const statusBgClass = (current: number, total: number) => {
-  if (current > total) return "bg-destructive/20";
-  if (current === total) return "bg-success/20";
-  return "bg-muted/20";
+  if (current > total) return "bg-red-100";
+  if (current === total) return "bg-green-100";
+  return "bg-gray-100";
 };
 
   useEffect(() => {
@@ -422,9 +422,8 @@ const statusBgClass = (current: number, total: number) => {
         }
         handledScanRef.current = true;
         setTimeout(() => {
-          stopCameraRef.current();
-          setCameraActive(false);
-        }, 250);
+          handledScanRef.current = false;
+        }, 1000);
       } else {
         setScanError("Բարկոդը չի գտնվել ապրանքների ցանկում");
       }
@@ -703,7 +702,7 @@ const statusBgClass = (current: number, total: number) => {
         </div>
         <div className="p-0 space-y-0">
           {tab === "camera" && (
-            <div className="relative border-b border-border bg-black/60 text-white">
+            <div className="sticky top-0 z-50 relative border-b border-border bg-black text-white">
               <div className="flex items-center justify-center gap-2 px-4 py-3 bg-black/70">
                 <button
                   type="button"
