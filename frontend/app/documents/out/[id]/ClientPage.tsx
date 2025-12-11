@@ -223,6 +223,7 @@ export default function OutOrderDetail({ id }: Props) {
         }
         throw new Error(message);
       }
+      router.replace("/");
       // success: maybe keep on page; consider toast
     } catch (err: any) {
       setSendError(err?.message ?? "Չհաջողվեց ուղարկել");

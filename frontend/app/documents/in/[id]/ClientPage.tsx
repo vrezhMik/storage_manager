@@ -71,7 +71,7 @@ const mapApiDocs = (data: any): PurchaseDoc[] => {
   }));
 };
 
-const DEFAULT_SUCCESS_REDIRECT = "/documents/in";
+const DEFAULT_SUCCESS_REDIRECT = "/";
 
 export default function InOrderDetail({ id }: Props) {
   const normalizeId = (value: string | null | undefined) => (value ?? "").trim();
@@ -557,17 +557,7 @@ export default function InOrderDetail({ id }: Props) {
         }
         throw new Error(message);
       }
-      let responseData: any = null;
-      try {
-        responseData = await res.json();
-      } catch {
-        // ignore non-JSON responses
-      }
-      const redirectPath =
-        typeof responseData?.redirect === "string"
-          ? responseData.redirect
-          : DEFAULT_SUCCESS_REDIRECT;
-      router.replace(redirectPath);
+      router.replace(DEFAULT_SUCCESS_REDIRECT);
     } catch (err: any) {
       setSendError(err?.message ?? "Չհաջողվեց ուղարկել");
     } finally {
