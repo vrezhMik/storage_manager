@@ -18,16 +18,10 @@ export default function AuthGuard({ children }: Props) {
 
     const ensure = async () => {
       try {
-        const res = await authFetch(`${API_BASE}/auth/me`, {
+        await authFetch(`${API_BASE}/auth/me`, {
           signal: controller.signal,
         });
         if (!active) return;
-        if (!res.ok) {
-          clearAuthStorage();
-          setAllowed(false);
-          router.replace("/login");
-          return;
-        }
         setAllowed(true);
       } catch (err: any) {
         if (!active) return;

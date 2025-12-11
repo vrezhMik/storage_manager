@@ -98,14 +98,17 @@ function normalizeHeaders(existing: HeadersInit | undefined): Record<string, str
 export async function authFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const url = path.startsWith("http") ? path : `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
 
-  const res = await fetch(url, {
+  const fetchOptions: RequestInit = {
     ...init,
+    cache: init.cache ?? "no-store",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(init.headers || {}),
     },
-  });
+  };
+
+  const res = await fetch(url, fetchOptions);
 
   if (res.status === 401) {
     // Attempt refresh if 401, trying to preserve original logic if possible, 
