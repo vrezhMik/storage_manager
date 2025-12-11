@@ -10,7 +10,7 @@ type Props = {
 
 export default function AuthGuard({ children }: Props) {
   const router = useRouter();
-  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [allowed, setAllowed] = useState(true);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -39,7 +39,7 @@ export default function AuthGuard({ children }: Props) {
     };
   }, [router]);
 
-  if (allowed !== true) return null;
+  if (!allowed) return null;
 
   return <>{children}</>;
 }
