@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import CameraIcon from "../../../UI/CameraIcon";
 import MinusIcon from "../../../UI/MinusIcon";
@@ -70,6 +71,8 @@ const mapApiDocs = (data: any): PurchaseDoc[] => {
   }));
 };
 
+const DEFAULT_SUCCESS_REDIRECT = "/documents/in";
+
 export default function InOrderDetail({ id }: Props) {
   const normalizeId = (value: string | null | undefined) => (value ?? "").trim();
   const targetId = normalizeId(id);
@@ -77,6 +80,7 @@ export default function InOrderDetail({ id }: Props) {
   const [doc, setDoc] = useState<PurchaseDoc | null | undefined>(undefined);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendLoading, setSendLoading] = useState(false);
+  const router = useRouter();
   useEffect(() => {
     setHydrated(true);
   }, []);
@@ -553,6 +557,17 @@ export default function InOrderDetail({ id }: Props) {
         }
         throw new Error(message);
       }
+      let responseData: any = null;
+      try {
+        responseData = await res.json();
+      } catch {
+        // ignore non-JSON responses
+      }
+      const redirectPath =
+        typeof responseData?.redirect === "string"
+          ? responseData.redirect
+          : DEFAULT_SUCCESS_REDIRECT;
+      router.replace(redirectPath);
     } catch (err: any) {
       setSendError(err?.message ?? "Չհաջողվեց ուղարկել");
     } finally {
