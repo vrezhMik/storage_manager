@@ -115,7 +115,8 @@ export default function PriceCheckClient() {
     requestRef.current = controller;
     setManualError(null);
     setSearchedCode(code);
-    setManualCode("");
+    // Keep the searched barcode visible in the input, whatever the source.
+    setManualCode(code);
     setResult(undefined);
     setLoading(true);
     try {
@@ -161,7 +162,11 @@ export default function PriceCheckClient() {
         return;
       }
       if (key.length === 1) {
+        // Mirror the scanner buffer into the input instead of letting keys
+        // append to the previous barcode.
+        e.preventDefault();
         deviceBufferRef.current += key;
+        setManualCode(deviceBufferRef.current);
         if (deviceTimeoutRef.current) clearTimeout(deviceTimeoutRef.current);
         deviceTimeoutRef.current = setTimeout(() => {
           deviceBufferRef.current = "";
