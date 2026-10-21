@@ -26,7 +26,7 @@ class AuthenticateJwt
         if (! $token) {
             return $this->unauthorized();
         }
-        $secret = config('app.jwt_secret') ?? env('JWT_SECRET');
+        $secret = config('app.jwt_secret');
 
         if (! $secret) {
             return $this->unauthorized('Token secret missing');

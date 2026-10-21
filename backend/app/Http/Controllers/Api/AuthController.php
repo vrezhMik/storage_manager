@@ -90,8 +90,8 @@ class AuthController extends Controller
 
     private function issueTokens(User $user): array
     {
-        $accessTtl = (int) env('JWT_ACCESS_TTL', 900); // seconds, default 15 minutes
-        $refreshTtlDays = (int) env('JWT_REFRESH_TTL_DAYS', 30);
+        $accessTtl = (int) config('app.jwt_access_ttl', 900); // seconds, default 15 minutes
+        $refreshTtlDays = (int) config('app.jwt_refresh_ttl_days', 30);
 
         $now = CarbonImmutable::now();
         $accessToken = $this->encodeJwt([
@@ -143,7 +143,7 @@ class AuthController extends Controller
 
         $accessMinutes = ($tokens['expires_in'] ?? 900) / 60;
         $refreshExpiry = $tokens['refresh_expires_at'] ?? null;
-        $refreshMinutes = $refreshExpiry ? now()->diffInMinutes($refreshExpiry) : (int) env('JWT_REFRESH_TTL_DAYS', 30) * 1440;
+        $refreshMinutes = $refreshExpiry ? now()->diffInMinutes($refreshExpiry) : (int) config('app.jwt_refresh_ttl_days', 30) * 1440;
 
         return [
             Cookie::make(
@@ -173,7 +173,7 @@ class AuthController extends Controller
 
     private function encodeJwt(array $payload): string
     {
-        $secret = config('app.jwt_secret') ?? env('JWT_SECRET');
+        $secret = config('app.jwt_secret');
         $algo = config('app.jwt_algo', 'HS256');
 
         if (! $secret) {

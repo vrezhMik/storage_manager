@@ -123,4 +123,18 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | JWT Auth
+    |--------------------------------------------------------------------------
+    |
+    | Read here (not via env() in app code) so they survive `config:cache`.
+    |
+    */
+
+    'jwt_secret' => env('JWT_SECRET'),
+    'jwt_algo' => env('JWT_ALGO', 'HS256'),
+    'jwt_access_ttl' => (int) env('JWT_ACCESS_TTL', 900),
+    'jwt_refresh_ttl_days' => (int) env('JWT_REFRESH_TTL_DAYS', 30),
+
 ];
