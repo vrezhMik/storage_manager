@@ -17,5 +17,7 @@ class DbEntry extends Model
         'api_get_orders',
         'api_post_orders',
         'api_post_purchases',
+        'api_price_check',
+        'api_sales',
     ];
 }

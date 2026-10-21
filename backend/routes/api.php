@@ -15,3 +15,5 @@ Route::middleware('auth.jwt')->get('orders', [OrderController::class, 'index']);
 Route::middleware('auth.jwt')->post('orders', [OrderController::class, 'store']);
 Route::middleware('auth.jwt')->get('purchases', [OrderController::class, 'purchases']);
 Route::middleware('auth.jwt')->post('purchases', [OrderController::class, 'storePurchase']);
+Route::middleware('auth.jwt')->get('price-check', [OrderController::class, 'priceCheck']);
+Route::middleware('auth.jwt')->get('sales', [OrderController::class, 'sales']);

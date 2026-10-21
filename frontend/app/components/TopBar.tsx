@@ -10,6 +10,10 @@ import { apiLogout } from "../lib/auth";
 function titleForPath(pathname: string) {
   if (pathname.startsWith("/documents/in")) return "Մուտքեր";
   if (pathname.startsWith("/documents/out")) return "Ելքեր";
+  if (pathname.startsWith("/reports/debts")) return "Պարտքեր";
+  if (pathname.startsWith("/reports/sales")) return "Վաճառքներ";
+  if (pathname.startsWith("/reports")) return "Հաշվետվություններ";
+  if (pathname.startsWith("/price-check")) return "Գնի հարցում";
   if (pathname.startsWith("/password")) return "Գաղտնաբառ";
   if (pathname === "/") return "Գլխավոր էջ";
   return "Flexit տերմինալ";

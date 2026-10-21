@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpFoundation\Response;
@@ -119,7 +120,79 @@ class OrderController extends Controller
         return response()->json($data, $status);
     }
 
-    private function proxy(Request $request, string $type): Response
+    public function priceCheck(Request $request): Response
+    {
+        $barcode = trim((string) $request->query('barcode', ''));
+
+        if ($barcode === '' || mb_strlen($barcode) > 255) {
+            return response()->json([
+                'message' => 'Barcode is required',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $endpoint = $request->user()?->dbEntry?->api_price_check;
+
+        // URL saved like ".../GET_ORDER?Barcode=" -> the barcode is appended to the end as is.
+        if ($endpoint && str_ends_with($endpoint, '=')) {
+            $dbEntry = $request->user()->dbEntry;
+
+            $response = Http::withBasicAuth($dbEntry->username, $dbEntry->password)
+                ->acceptJson()
+                ->withHeaders(['Accept-Encoding' => 'identity'])
+                ->withOptions(['http_errors' => false])
+                ->get($endpoint.rawurlencode($barcode));
+
+            if ($response->failed()) {
+                return response()->json([
+                    'message' => 'Failed to fetch price check',
+                    'status' => $response->status(),
+                    'body' => $response->json() ?? $response->body(),
+                ], Response::HTTP_BAD_GATEWAY);
+            }
+
+            $data = $response->json();
+
+            return response()->json($data ?? $response->body(), $response->status());
+        }
+
+        return $this->proxy($request, 'price check', ['Barcode' => $barcode]);
+    }
+
+    public function sales(Request $request): Response
+    {
+        $dates = [];
+
+        foreach (['start' => 'Datestart', 'end' => 'Date'] as $param => $key) {
+            $raw = (string) $request->query($param, '');
+
+            try {
+                $date = Carbon::createFromFormat('!Y-m-d', $raw);
+            } catch (\Throwable) {
+                $date = false;
+            }
+
+            if (! $date || $date->format('Y-m-d') !== $raw) {
+                return response()->json([
+                    'message' => 'Invalid '.$param.' date, expected YYYY-MM-DD',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $dates[$key] = $date;
+        }
+
+        if ($dates['Datestart']->gt($dates['Date'])) {
+            return response()->json([
+                'message' => 'Start date must not be after end date',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $this->proxy($request, 'sales', [
+            'Datestart' => $dates['Datestart']->format('d.m.Y'),
+            'Date' => $dates['Date']->format('d.m.Y'),
+        ]);
+    }
+
+    private function proxy(Request $request, string $type, ?array $query = null): Response
     {
         $user = $request->user();
         $dbEntry = $user?->dbEntry;
@@ -130,9 +203,20 @@ class OrderController extends Controller
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        $endpoint = $type === 'purchases' ? $dbEntry->api_get_purchase : $dbEntry->api_get_orders;
+        $endpoint = match ($type) {
+            'purchases' => $dbEntry->api_get_purchase,
+            'price check' => $dbEntry->api_price_check,
+            'sales' => $dbEntry->api_sales,
+            default => $dbEntry->api_get_orders,
+        };
 
-        $query = $request->query();
+        if (! $endpoint) {
+            return response()->json([
+                'message' => 'No '.$type.' endpoint configured for this user',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $query ??= $request->query();
 
         $storedQuery = [];
         $baseUrl = $endpoint;

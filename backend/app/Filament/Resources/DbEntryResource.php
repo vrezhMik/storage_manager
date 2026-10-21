@@ -56,6 +56,14 @@ class DbEntryResource extends Resource
                 ->label('API: Post Purchases')
                 ->required()
                 ->maxLength(255),
+            Forms\Components\TextInput::make('api_price_check')
+                ->label('API: Price Check')
+                ->helperText('The barcode is appended to the end, e.g. http://host:port/terminal/hs/Eportal/GET_ORDER?Barcode=')
+                ->maxLength(255),
+            Forms\Components\TextInput::make('api_sales')
+                ->label('API: Sales')
+                ->helperText('Datestart and Date are filled in as DD.MM.YYYY, e.g. http://host:port/terminal/hs/Eportal/Sales?Datestart=&Date=')
+                ->maxLength(255),
         ]);
     }
 
@@ -83,6 +91,14 @@ class DbEntryResource extends Resource
                     ->tooltip(fn ($state) => $state),
                 Tables\Columns\TextColumn::make('api_post_purchases')
                     ->label('Post Purchases API')
+                    ->limit(50)
+                    ->tooltip(fn ($state) => $state),
+                Tables\Columns\TextColumn::make('api_price_check')
+                    ->label('Price Check API')
+                    ->limit(50)
+                    ->tooltip(fn ($state) => $state),
+                Tables\Columns\TextColumn::make('api_sales')
+                    ->label('Sales API')
                     ->limit(50)
                     ->tooltip(fn ($state) => $state),
                 Tables\Columns\TextColumn::make('created_at')
