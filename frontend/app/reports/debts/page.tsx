@@ -1,9 +1,9 @@
 import dynamic from "next/dynamic";
 
-const ReportPlaceholder = dynamic(() => import("../components/ReportPlaceholder"), {
+const DebtsPageClient = dynamic(() => import("./DebtsPageClient"), {
   ssr: false,
 });
 
 export default function Page() {
-  return <ReportPlaceholder title="Պարտքեր" />;
+  return <DebtsPageClient />;
 }

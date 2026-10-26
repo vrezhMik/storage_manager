@@ -11,9 +11,15 @@ function titleForPath(pathname: string) {
   if (pathname.startsWith("/documents/in")) return "Մուտքեր";
   if (pathname.startsWith("/documents/out")) return "Ելքեր";
   if (pathname.startsWith("/reports/debts")) return "Պարտքեր";
-  if (pathname.startsWith("/reports/sales")) return "Վաճառքներ";
+  if (pathname.startsWith("/reports/overdue-debts")) return "Ժամկետանց պարտքեր";
+  if (pathname.startsWith("/reports/sales-monthly")) return "Վաճառքի դինամիկա";
+  if (pathname.startsWith("/reports/frozen-stock")) return "Սառեցված մնացորդ";
+  if (pathname.startsWith("/reports/abc")) return "Թոփ ապրանքներ (ABC)";
+  if (pathname.startsWith("/reports/sales-by-warehouse")) return "Վաճառք ըստ պահեստների";
+  if (pathname.startsWith("/reports/sales")) return "Վաճառք ըստ մենեջերների";
   if (pathname.startsWith("/reports")) return "Հաշվետվություններ";
   if (pathname.startsWith("/price-check")) return "Գնի հարցում";
+  if (pathname.startsWith("/dashboard")) return "Flexit Դաշբորդ";
   if (pathname.startsWith("/password")) return "Գաղտնաբառ";
   if (pathname === "/") return "Գլխավոր էջ";
   return "Flexit տերմինալ";

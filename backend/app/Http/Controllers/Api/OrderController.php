@@ -160,6 +160,129 @@ class OrderController extends Controller
 
     public function sales(Request $request): Response
     {
+        return $this->dateRangeReport($request, 'sales');
+    }
+
+    public function salesByWarehouse(Request $request): Response
+    {
+        return $this->dateRangeReport($request, 'sales by warehouse');
+    }
+
+    public function debts(Request $request): Response
+    {
+        return $this->dateRangeReport($request, 'debts');
+    }
+
+    public function abc(Request $request): Response
+    {
+        return $this->dateRangeReport($request, 'abc');
+    }
+
+    /**
+     * Optional ?group=manager|partner|item -> GroupBy=Manager|Partner|Item for 1C.
+     */
+    public function salesMonthly(Request $request): Response
+    {
+        $groups = ['manager' => 'Manager', 'partner' => 'Partner', 'item' => 'Item'];
+        $group = (string) $request->query('group', '');
+
+        if ($group !== '' && ! isset($groups[$group])) {
+            return response()->json([
+                'message' => 'Invalid group, expected manager, partner or item',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $this->dateRangeReport(
+            $request,
+            'sales monthly',
+            $group === '' ? [] : ['GroupBy' => $groups[$group]],
+        );
+    }
+
+    /**
+     * ?date=YYYY-MM-DD (optional, defaults to today) -> Date=DD.MM.YYYY for 1C.
+     */
+    public function overdueDebts(Request $request): Response
+    {
+        $date = $this->optionalDate($request);
+        if ($date instanceof Response) {
+            return $date;
+        }
+
+        return $this->proxy($request, 'overdue debts', ['Date' => $date->format('d.m.Y')]);
+    }
+
+    /**
+     * ?date=YYYY-MM-DD (optional, defaults to today) -> Date=DD.MM.YYYY for 1C.
+     */
+    public function dashboard(Request $request): Response
+    {
+        $date = $this->optionalDate($request);
+        if ($date instanceof Response) {
+            return $date;
+        }
+
+        return $this->proxy($request, 'dashboard', ['Date' => $date->format('d.m.Y')]);
+    }
+
+    /**
+     * ?date=YYYY-MM-DD (optional) &days=N (1..3650, default 60) -> Date / Days for 1C.
+     */
+    public function frozenStock(Request $request): Response
+    {
+        $date = $this->optionalDate($request);
+        if ($date instanceof Response) {
+            return $date;
+        }
+
+        $days = filter_var($request->query('days', 60), FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1, 'max_range' => 3650],
+        ]);
+
+        if ($days === false) {
+            return response()->json([
+                'message' => 'Invalid days, expected a number from 1 to 3650',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $this->proxy($request, 'frozen stock', [
+            'Date' => $date->format('d.m.Y'),
+            'Days' => $days,
+        ]);
+    }
+
+    /**
+     * Parses the optional ?date=YYYY-MM-DD (today when missing), or returns a 422 response.
+     */
+    private function optionalDate(Request $request): Carbon|Response
+    {
+        $raw = (string) $request->query('date', '');
+
+        if ($raw === '') {
+            return now()->startOfDay();
+        }
+
+        try {
+            $parsed = Carbon::createFromFormat('!Y-m-d', $raw);
+        } catch (\Throwable) {
+            $parsed = false;
+        }
+
+        if (! $parsed || $parsed->format('Y-m-d') !== $raw) {
+            return response()->json([
+                'message' => 'Invalid date, expected YYYY-MM-DD',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * Reports that take ?start=YYYY-MM-DD&end=YYYY-MM-DD and pass them to 1C
+     * as Datestart / Date in DD.MM.YYYY.
+     */
+    private function dateRangeReport(Request $request, string $type, array $extraQuery = []): Response
+    {
         $dates = [];
 
         foreach (['start' => 'Datestart', 'end' => 'Date'] as $param => $key) {
@@ -186,10 +309,10 @@ class OrderController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        return $this->proxy($request, 'sales', [
+        return $this->proxy($request, $type, [
             'Datestart' => $dates['Datestart']->format('d.m.Y'),
             'Date' => $dates['Date']->format('d.m.Y'),
-        ]);
+        ] + $extraQuery);
     }
 
     private function proxy(Request $request, string $type, ?array $query = null): Response
@@ -207,6 +330,13 @@ class OrderController extends Controller
             'purchases' => $dbEntry->api_get_purchase,
             'price check' => $dbEntry->api_price_check,
             'sales' => $dbEntry->api_sales,
+            'sales by warehouse' => $dbEntry->api_sales_by_warehouse,
+            'debts' => $dbEntry->api_debts,
+            'dashboard' => $dbEntry->api_dashboard,
+            'frozen stock' => $dbEntry->api_frozen_stock,
+            'abc' => $dbEntry->api_abc,
+            'overdue debts' => $dbEntry->api_overdue_debts,
+            'sales monthly' => $dbEntry->api_sales_monthly,
             default => $dbEntry->api_get_orders,
         };
 

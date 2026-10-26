@@ -853,7 +853,7 @@ const statusBgClass = (current: number, total: number) => {
   };
 
   return (
-    <AuthGuard>
+    <AuthGuard section="documents_out">
       <div className="App">
         <main className="container mx-auto px-4 py-6 pb-20">
           {!hydrated || doc === undefined

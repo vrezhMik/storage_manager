@@ -8,10 +8,17 @@ import {
   API_BASE,
   refreshAccessToken,
   USER_EMAIL_KEY,
+  Section,
+  getUserSections,
+  storeUserSections,
 } from "../lib/auth";
+
+export const SECTIONS_CHANGED_EVENT = "user-sections-changed";
 
 type Props = {
   children: ReactNode;
+  // When set, users without access to this section are sent to the home page.
+  section?: Section;
 };
 
 const getInitialAllowed = () => {
@@ -19,9 +26,32 @@ const getInitialAllowed = () => {
   return Boolean(window.localStorage.getItem(USER_EMAIL_KEY));
 };
 
-export default function AuthGuard({ children }: Props) {
+// Keep the stored sections in sync with the backend, so admin changes apply
+// without logging out.
+const syncSections = (me: any) => {
+  if (!me?.sections) return;
+  storeUserSections(me.sections);
+  window.dispatchEvent(new Event(SECTIONS_CHANGED_EVENT));
+};
+
+export default function AuthGuard({ children, section }: Props) {
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean>(getInitialAllowed);
+  const [sectionAllowed, setSectionAllowed] = useState<boolean>(
+    () => !section || getUserSections()[section],
+  );
+
+  useEffect(() => {
+    if (!section) return;
+    const check = () => {
+      const ok = getUserSections()[section];
+      setSectionAllowed(ok);
+      if (!ok) router.replace("/");
+    };
+    check();
+    window.addEventListener(SECTIONS_CHANGED_EVENT, check);
+    return () => window.removeEventListener(SECTIONS_CHANGED_EVENT, check);
+  }, [section, router]);
 
   useEffect(() => {
     if (!allowed) {
@@ -35,10 +65,11 @@ export default function AuthGuard({ children }: Props) {
 
     const ensure = async () => {
       try {
-        await authFetch(`${API_BASE}/auth/me`, {
+        const me = await authFetch(`${API_BASE}/auth/me`, {
           signal: controller.signal,
         });
         if (!active) return;
+        syncSections(me);
         setAllowed(true);
       } catch (err: any) {
         if (!active) return;
@@ -48,9 +79,10 @@ export default function AuthGuard({ children }: Props) {
           refreshed = await refreshAccessToken();
           if (refreshed) {
             try {
-              await authFetch(`${API_BASE}/auth/me`, {
+              const me = await authFetch(`${API_BASE}/auth/me`, {
                 signal: controller.signal,
               });
+              if (active) syncSections(me);
               return;
             } catch {
               // fall through to logout
@@ -71,7 +103,7 @@ export default function AuthGuard({ children }: Props) {
     };
   }, [allowed, router]);
 
-  if (!allowed) return null;
+  if (!allowed || !sectionAllowed) return null;
 
   return <>{children}</>;
 }

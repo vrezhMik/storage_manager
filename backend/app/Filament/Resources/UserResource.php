@@ -7,6 +7,7 @@ use App\Models\User;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -50,6 +51,26 @@ class UserResource extends Resource
                 ->label('Allow manual text input')
                 ->default(true)
                 ->helperText('Controls whether the barcode input field is shown'),
+            Section::make('Terminal sections')
+                ->description('Sections this user can see in the terminal')
+                ->columns(2)
+                ->schema([
+                    Forms\Components\Checkbox::make('can_documents_in')
+                        ->label('Մուտքեր (Incoming)')
+                        ->default(true),
+                    Forms\Components\Checkbox::make('can_documents_out')
+                        ->label('Ելքեր (Outgoing)')
+                        ->default(true),
+                    Forms\Components\Checkbox::make('can_reports')
+                        ->label('Հաշվետվություններ (Reports)')
+                        ->default(true),
+                    Forms\Components\Checkbox::make('can_price_check')
+                        ->label('Գնի հարցում (Price check)')
+                        ->default(true),
+                    Forms\Components\Checkbox::make('can_dashboard')
+                        ->label('Flexit Դաշբորդ (Dashboard)')
+                        ->default(false),
+                ]),
             Forms\Components\Select::make('db_entry_id')
                 ->label('DB Config')
                 ->relationship('dbEntry', 'name')
@@ -81,6 +102,17 @@ class UserResource extends Resource
                     Tables\Columns\IconColumn::make('allow_manual_text_input')
                         ->boolean()
                         ->label('Text input'),
+                    Tables\Columns\TextColumn::make('visible_sections')
+                        ->label('Sections')
+                        ->state(fn (User $record) => collect([
+                            'can_documents_in' => 'Մուտքեր',
+                            'can_documents_out' => 'Ելքեր',
+                            'can_reports' => 'Հաշվետվություններ',
+                            'can_price_check' => 'Գնի հարցում',
+                            'can_dashboard' => 'Flexit Դաշբորդ',
+                        ])->filter(fn ($label, $column) => (bool) $record->{$column})->values()->all())
+                        ->badge()
+                        ->placeholder('—'),
                     Tables\Columns\TextColumn::make('created_at')
                         ->dateTime()
                         ->sortable(),

@@ -447,7 +447,7 @@ export default function PriceCheckClient() {
   }, [tab, cameraActive, processCode]);
 
   return (
-    <AuthGuard>
+    <AuthGuard section="price_check">
       <div className="App">
         <main className="container mx-auto px-4 py-6 pb-20">
           <div className="space-y-4">

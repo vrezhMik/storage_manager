@@ -94,7 +94,7 @@ export default function DocumentsInPageClient() {
   }
 
   return (
-    <AuthGuard>
+    <AuthGuard section="documents_in">
       <div className="App">
         <main className="container mx-auto px-4 py-6 pb-20">
           {error && (

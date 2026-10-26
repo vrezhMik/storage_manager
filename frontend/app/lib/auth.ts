@@ -4,6 +4,41 @@ export const ACCESS_EXPIRES_AT_KEY = "access_expires_at";
 export const USER_EMAIL_KEY = "user_email";
 export const USER_MANUAL_ALLOWED_KEY = "user_manual_allowed";
 export const USER_MANUAL_TEXT_ALLOWED_KEY = "user_manual_text_allowed";
+export const USER_SECTIONS_KEY = "user_sections";
+
+export type Section = "documents_in" | "documents_out" | "reports" | "price_check" | "dashboard";
+export type SectionAccess = Record<Section, boolean>;
+
+// Used when the backend has not told us yet; the dashboard stays hidden.
+const ALL_SECTIONS: SectionAccess = {
+  documents_in: true,
+  documents_out: true,
+  reports: true,
+  price_check: true,
+  dashboard: false,
+};
+
+export function storeUserSections(sections: Partial<SectionAccess> | undefined | null) {
+  if (typeof window === "undefined" || !sections || typeof sections !== "object") return;
+  window.localStorage.setItem(USER_SECTIONS_KEY, JSON.stringify(sections));
+}
+
+// Sections missing from the stored data fall back to ALL_SECTIONS, so an older
+// backend that does not send them keeps showing the regular sections.
+export function getUserSections(): SectionAccess {
+  if (typeof window === "undefined") return ALL_SECTIONS;
+  try {
+    const raw = window.localStorage.getItem(USER_SECTIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (!parsed || typeof parsed !== "object") return ALL_SECTIONS;
+    return (Object.keys(ALL_SECTIONS) as Section[]).reduce((acc, key) => {
+      acc[key] = key in parsed ? parsed[key] === true : ALL_SECTIONS[key];
+      return acc;
+    }, { ...ALL_SECTIONS });
+  } catch {
+    return ALL_SECTIONS;
+  }
+}
 
 const isBrowser = typeof window !== "undefined";
 const API_BASE =
@@ -16,6 +51,7 @@ export function storeAuthTokens(data: {
     email?: string;
     allow_manual_items?: boolean;
     allow_manual_text_input?: boolean;
+    sections?: Partial<SectionAccess>;
   };
 }) {
   if (!isBrowser) return;
@@ -34,6 +70,7 @@ export function storeAuthTokens(data: {
       String(data.user.allow_manual_text_input),
     );
   }
+  storeUserSections(data.user?.sections);
 }
 
 export function clearAuthStorage() {
@@ -45,6 +82,7 @@ export function clearAuthStorage() {
     USER_EMAIL_KEY,
     USER_MANUAL_ALLOWED_KEY,
     USER_MANUAL_TEXT_ALLOWED_KEY,
+    USER_SECTIONS_KEY,
   ].forEach((key) => window.localStorage.removeItem(key));
 }
 

@@ -92,7 +92,7 @@ export default function DocumentsOutPageClient() {
   }
 
   return (
-    <AuthGuard>
+    <AuthGuard section="documents_out">
       <div className="App">
         <main className="container mx-auto px-4 py-6 pb-20">
           {error && (
