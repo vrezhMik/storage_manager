@@ -13,25 +13,139 @@ import {
   authFetch,
 } from "../lib/auth";
 
-// 1C returns { Barcode, ItemID, ItemName, Price, Stock }; only the last three are shown.
+// 1C returns { Barcode, ItemID, ItemName, Price, Stock }; ItemName, Price and Stock are shown.
+// Stock is either a single number or broken down by warehouse, in one of these shapes:
+//   Stock: [{ Warehouse: "...", Stock: 5 }, ...]
+//   Stock: { "<warehouse>": 5, ... }
+//   several rows of the same item, each with its own Warehouse + Stock
+type RawItem = Record<string, unknown>;
+
+type WarehouseStock = { name: string; qty: unknown };
+
 type PriceItem = {
-  ItemName?: string;
-  Price?: number | string;
-  Stock?: number | string;
+  name: unknown;
+  price: unknown;
+  stock: unknown;
+  warehouses: WarehouseStock[] | null;
+  segment: unknown;
 };
 
+const WAREHOUSE_NAME_KEYS = ["Warehouse", "WarehouseName", "Store", "Склад", "СкладНаименование", "Name", "Наименование"];
+const WAREHOUSE_QTY_KEYS = ["Stock", "Quantity", "Qty", "Остаток", "Количество"];
+
+const pick = (obj: RawItem, keys: string[]) => {
+  const key = keys.find((k) => k in obj);
+  return key ? obj[key] : undefined;
+};
+
+const isRecord = (value: unknown): value is RawItem =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const toWarehouses = (stock: unknown): WarehouseStock[] | null => {
+  if (Array.isArray(stock)) {
+    return stock.filter(isRecord).map((w) => ({
+      name: String(pick(w, WAREHOUSE_NAME_KEYS) ?? "—"),
+      qty: pick(w, WAREHOUSE_QTY_KEYS),
+    }));
+  }
+  if (isRecord(stock)) {
+    return Object.entries(stock).map(([name, qty]) => ({ name, qty }));
+  }
+  return null;
+};
+
+// Warehouse name at the item level (shape 3); "Name"-like keys are skipped
+// there because they would clash with the item name.
+const rowWarehouse = (row: RawItem) =>
+  pick(row, ["Warehouse", "WarehouseName", "Store", "Склад", "СкладНаименование"]);
+
 const toPriceItems = (data: unknown): PriceItem[] => {
-  const list = Array.isArray(data) ? data : [data];
-  return list.filter(
-    (entry): entry is PriceItem =>
-      Boolean(entry) &&
-      typeof entry === "object" &&
-      Boolean((entry as PriceItem).ItemName),
+  const rows = (Array.isArray(data) ? data : [data]).filter(
+    (entry): entry is RawItem => isRecord(entry) && Boolean(entry.ItemName),
   );
+  const items: PriceItem[] = [];
+  const byKey = new Map<string, PriceItem>();
+
+  rows.forEach((row) => {
+    const warehouse = rowWarehouse(row);
+    if (warehouse === undefined) {
+      items.push({
+        name: row.ItemName,
+        price: row.Price,
+        stock: row.Stock,
+        warehouses: toWarehouses(row.Stock),
+        segment: row.Segment,
+      });
+      return;
+    }
+    const key = String(row.ItemID ?? row.Barcode ?? row.ItemName);
+    let item = byKey.get(key);
+    if (!item) {
+      item = {
+        name: row.ItemName,
+        price: row.Price,
+        stock: undefined,
+        warehouses: [],
+        segment: row.Segment,
+      };
+      byKey.set(key, item);
+      items.push(item);
+    }
+    item.warehouses!.push({ name: String(warehouse), qty: row.Stock });
+  });
+
+  return items;
 };
 
 const displayValue = (value: unknown) =>
   value === null || value === undefined || value === "" ? "—" : String(value);
+
+const toNumber = (value: unknown) => {
+  const n = typeof value === "number" ? value : Number(String(value ?? "").replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
+const formatQty = (n: number) => n.toLocaleString("ru-RU", { maximumFractionDigits: 3 });
+
+function WarehouseList({ warehouses }: { warehouses: WarehouseStock[] }) {
+  if (warehouses.length === 0) {
+    return <span className="text-sm text-muted-foreground">—</span>;
+  }
+  const numbers = warehouses.map((w) => toNumber(w.qty));
+  const total = numbers.every((n) => n !== null)
+    ? numbers.reduce<number>((sum, n) => sum + (n ?? 0), 0)
+    : null;
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="text-xs text-muted-foreground">
+          <th className="py-1 pr-3 text-left font-normal">Պահեստ</th>
+          <th className="py-1 text-right font-normal">Մնացորդ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {warehouses.map((w, idx) => (
+          <tr key={`${w.name}-${idx}`} className="border-t border-border">
+            <td className="py-1.5 pr-3 text-foreground break-words">{w.name}</td>
+            <td className="py-1.5 text-right font-semibold text-foreground tabular-nums">
+              {toNumber(w.qty) === null ? displayValue(w.qty) : formatQty(toNumber(w.qty)!)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+      {warehouses.length > 1 && total !== null && (
+        <tfoot>
+          <tr className="border-t-2 border-border">
+            <td className="py-1.5 pr-3 text-muted-foreground">Ընդամենը</td>
+            <td className="py-1.5 text-right font-bold text-foreground tabular-nums">
+              {formatQty(total)}
+            </td>
+          </tr>
+        </tfoot>
+      )}
+    </table>
+  );
+}
 
 function PriceResult({ data }: { data: unknown }) {
   const items = toPriceItems(data);
@@ -41,23 +155,35 @@ function PriceResult({ data }: { data: unknown }) {
   return (
     <div className="space-y-3">
       {items.map((item, idx) => (
-        <dl
-          key={idx}
-          className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 border-t border-border pt-3 first:border-0 first:pt-0"
-        >
-          <dt className="text-sm text-muted-foreground">Ապրանք</dt>
-          <dd className="text-sm font-semibold text-foreground break-words">
-            {displayValue(item.ItemName)}
-          </dd>
-          <dt className="text-sm text-muted-foreground">Գին</dt>
-          <dd className="text-lg font-semibold text-foreground">
-            {displayValue(item.Price)}
-          </dd>
-          <dt className="text-sm text-muted-foreground">Մնացորդ</dt>
-          <dd className="text-sm font-semibold text-foreground">
-            {displayValue(item.Stock)}
-          </dd>
-        </dl>
+        <div key={idx} className="space-y-3 border-t border-border pt-3 first:border-0 first:pt-0">
+          <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2">
+            <dt className="text-sm text-muted-foreground">Ապրանք</dt>
+            <dd className="text-sm font-semibold text-foreground break-words">
+              {displayValue(item.name)}
+            </dd>
+            <dt className="text-sm text-muted-foreground">Գին</dt>
+            <dd className="text-lg font-semibold text-foreground">
+              {displayValue(item.price)}
+            </dd>
+            {!item.warehouses && (
+              <>
+                <dt className="text-sm text-muted-foreground">Մնացորդ</dt>
+                <dd className="text-sm font-semibold text-foreground">
+                  {displayValue(item.stock)}
+                </dd>
+              </>
+            )}
+          </dl>
+          {item.warehouses && <WarehouseList warehouses={item.warehouses} />}
+          {item.segment !== undefined && item.segment !== null && item.segment !== "" && (
+            <dl className="grid grid-cols-[auto,1fr] gap-x-4 border-t border-border pt-3">
+              <dt className="text-sm text-muted-foreground">Խումբ</dt>
+              <dd className="text-sm font-semibold text-foreground break-words">
+                {displayValue(item.segment)}
+              </dd>
+            </dl>
+          )}
+        </div>
       ))}
     </div>
   );
