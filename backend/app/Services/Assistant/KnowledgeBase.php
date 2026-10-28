@@ -123,11 +123,11 @@ class KnowledgeBase
             return $document;
         }
 
-        if (! $source->file_path || ! Storage::disk('local')->exists($source->file_path)) {
+        if (! $source->file_path || ! Storage::disk('kb')->exists($source->file_path)) {
             throw new RuntimeException('The uploaded file is missing');
         }
 
-        return $this->extractor->fromFile(Storage::disk('local')->path($source->file_path), $source->file_path);
+        return $this->extractor->fromFile(Storage::disk('kb')->path($source->file_path), $source->file_path);
     }
 
     /**

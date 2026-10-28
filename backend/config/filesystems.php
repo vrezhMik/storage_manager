@@ -30,6 +30,21 @@ return [
 
     'disks' => [
 
+        // Knowledge-base documents for the AI assistant. Same folder as "local",
+        // but readable by other users: files are uploaded by the web server
+        // (www-data) and indexed by the queue worker (another user).
+        'kb' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private'),
+            'visibility' => 'public',
+            'permissions' => [
+                'file' => ['public' => 0644, 'private' => 0600],
+                'dir' => ['public' => 0755, 'private' => 0700],
+            ],
+            'throw' => false,
+            'report' => false,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),

@@ -18,7 +18,7 @@ class SourceImporter
     private const MAX_ARCHIVE_ENTRIES = 2000;
 
     /**
-     * @param  string  $path  path on the "local" disk
+     * @param  string  $path  path on the "kb" disk
      * @return KbSource[]
      */
     public function import(string $path): array
@@ -54,7 +54,7 @@ class SourceImporter
             throw new RuntimeException('ZIP support (php-zip) is not installed on the server');
         }
 
-        $disk = Storage::disk('local');
+        $disk = Storage::disk('kb');
         $zip = new ZipArchive();
         if ($zip->open($disk->path($path)) !== true) {
             throw new RuntimeException('Cannot open the ZIP archive');
@@ -100,7 +100,7 @@ class SourceImporter
      */
     private function createSources(array $files): array
     {
-        $disk = Storage::disk('local');
+        $disk = Storage::disk('kb');
         $used = [];
         $sources = [];
 
@@ -161,7 +161,7 @@ class SourceImporter
             if (! str_starts_with($name, $prefix) || ! preg_match('/\.html?$/i', $name)) {
                 continue;
             }
-            $size = Storage::disk('local')->size($stored);
+            $size = Storage::disk('kb')->size($stored);
             if ($size > $bestSize) {
                 $best = $name;
                 $bestSize = $size;

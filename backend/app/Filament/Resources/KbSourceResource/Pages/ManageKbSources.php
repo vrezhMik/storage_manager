@@ -32,7 +32,7 @@ class ManageKbSources extends ManageRecords
                 ->schema([
                     Forms\Components\FileUpload::make('files')
                         ->label('Files (.zip, .mhtml, .html, .htm, .txt, .md)')
-                        ->disk('local')
+                        ->disk('kb')
                         ->directory('kb/uploads')
                         ->preserveFilenames()
                         ->multiple()

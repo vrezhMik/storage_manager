@@ -14,6 +14,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 use UnitEnum;
 
 class KbSourceResource extends Resource
@@ -54,7 +55,7 @@ class KbSourceResource extends Resource
                 ->visible(fn (Get $get) => $get('type') === KbSource::TYPE_URL),
             Forms\Components\FileUpload::make('file_path')
                 ->label('File')
-                ->disk('local')
+                ->disk('kb')
                 ->directory('kb')
                 ->preserveFilenames()
                 ->maxSize(10240)
@@ -99,6 +100,11 @@ class KbSourceResource extends Resource
                 Actions\DeleteAction::make(),
             ])
             ->bulkActions([
+                Actions\BulkAction::make('indexSelected')
+                    ->label('Index selected')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(fn (Collection $records) => static::runIndexMany($records))
+                    ->deselectRecordsAfterCompletion(),
                 Actions\DeleteBulkAction::make(),
             ]);
     }
@@ -124,6 +130,37 @@ class KbSourceResource extends Resource
                 ->persistent()
                 ->send();
         }
+    }
+
+    // Synchronous indexing stops before PHP / nginx time limits are reached.
+    private const SYNC_TIME_BUDGET_SECONDS = 240;
+
+    /**
+     * Indexes the selected sources in this request (no queue worker needed).
+     *
+     * @param  Collection<int, KbSource>  $records
+     */
+    public static function runIndexMany(Collection $records): void
+    {
+        set_time_limit(self::SYNC_TIME_BUDGET_SECONDS + 60);
+        $started = time();
+        $indexed = 0;
+        $failed = 0;
+        $skipped = 0;
+
+        foreach ($records as $record) {
+            if (time() - $started >= self::SYNC_TIME_BUDGET_SECONDS) {
+                $skipped++;
+                continue;
+            }
+            $record = app(KnowledgeBase::class)->index($record);
+            $record->status === KbSource::STATUS_INDEXED ? $indexed++ : $failed++;
+        }
+
+        Notification::make()
+            ->title($indexed.' indexed'.($failed ? ', '.$failed.' failed' : '').($skipped ? ', '.$skipped.' left — run again' : ''))
+            ->{$failed ? 'warning' : 'success'}()
+            ->send();
     }
 
     public static function getPages(): array
