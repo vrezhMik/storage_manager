@@ -23,7 +23,7 @@ const SECTION_LINKS: {
   { section: "documents_out", href: "/documents/out", label: "Ելքեր", Icon: ArrowUpFromLineIcon },
   { section: "reports", href: "/reports", label: "Հաշվետվություններ", Icon: ChartIcon },
   { section: "price_check", href: "/price-check", label: "Գնի հարցում", Icon: TagIcon },
-  { section: "assistant", href: "/assistant", label: "AI Օգնական", Icon: SparklesIcon },
+  { section: "assistant", href: "/assistant", label: "Flexik օգնական", Icon: SparklesIcon },
 ];
 
 const baseLinkClass =

@@ -227,13 +227,7 @@ export function AssistantView({ onAsk, response, loading, error, history }: View
       <main className="container mx-auto px-4 py-6 pb-20">
         <div className="space-y-4">
           <div className={`${cardClass} space-y-3`}>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-semibold text-foreground">AI Օգնական</h2>
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">թեստային</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Տվեք հարց հայերեն կամ ռուսերեն. օգնականը կգտնի պատասխանը բեռնված ուղեցույցներում և ցույց կտա աղբյուրը։
-            </p>
+            <h2 className="text-xl font-semibold text-foreground">Flexik օգնական</h2>
             <form
               className="space-y-2"
               onSubmit={(e) => {
@@ -330,7 +324,7 @@ export default function AssistantClient() {
       console.error("Assistant search failed", err);
       setError(
         String(err?.message ?? "").includes("503")
-          ? "AI ծառայությունը հիմա հասանելի չէ։ Փորձեք մի փոքր ուշ։"
+          ? "Օգնականը հիմա հասանելի չէ։ Փորձեք մի փոքր ուշ։"
           : "Չհաջողվեց ստանալ պատասխանը",
       );
     } finally {
