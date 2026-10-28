@@ -72,6 +72,8 @@ const EXAMPLES = [
 
 const cardClass = "rounded-xl border bg-card text-card-foreground shadow p-5";
 const COLLAPSED_CHARS = 420;
+// Pictures shown before "Read all" is pressed.
+const SNIPPET_IMAGES = 2;
 
 function ResultCard({ result, rank }: { result: AssistantResult; rank: number }) {
   const [open, setOpen] = useState(false);
@@ -88,6 +90,7 @@ function ResultCard({ result, rank }: { result: AssistantResult; rank: number })
   const snippet =
     plain.length > COLLAPSED_CHARS ? `${plain.slice(0, COLLAPSED_CHARS).replace(/\s+\S*$/, "")}…` : plain;
   const images = countImages(full);
+  const snippetImages = (content.match(IMAGE_MARKER) ?? []).slice(0, SNIPPET_IMAGES);
   const long = stripImages(full).length > snippet.length || images > 0;
   const relevance = Math.max(0, Math.min(100, Math.round(result.score * 100)));
 
@@ -112,7 +115,13 @@ function ResultCard({ result, rank }: { result: AssistantResult; rank: number })
       {open ? (
         <RichText text={full} sourceId={result.source.id} />
       ) : (
-        <p className="whitespace-pre-line text-sm text-foreground break-words">{snippet}</p>
+        <>
+          <p className="whitespace-pre-line text-sm text-foreground break-words">{snippet}</p>
+          {/* Pictures of the matching part are shown right away. */}
+          {snippetImages.length > 0 && (
+            <RichText text={snippetImages.join("\n")} sourceId={result.source.id} />
+          )}
+        </>
       )}
       <div className="flex flex-wrap items-center gap-3 text-xs">
         {long && (
