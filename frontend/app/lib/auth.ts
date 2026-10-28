@@ -6,7 +6,7 @@ export const USER_MANUAL_ALLOWED_KEY = "user_manual_allowed";
 export const USER_MANUAL_TEXT_ALLOWED_KEY = "user_manual_text_allowed";
 export const USER_SECTIONS_KEY = "user_sections";
 
-export type Section = "documents_in" | "documents_out" | "reports" | "price_check" | "dashboard";
+export type Section = "documents_in" | "documents_out" | "reports" | "price_check" | "dashboard" | "assistant";
 export type SectionAccess = Record<Section, boolean>;
 
 // Used when the backend has not told us yet; the dashboard stays hidden.
@@ -16,6 +16,7 @@ const ALL_SECTIONS: SectionAccess = {
   reports: true,
   price_check: true,
   dashboard: false,
+  assistant: false,
 };
 
 export function storeUserSections(sections: Partial<SectionAccess> | undefined | null) {

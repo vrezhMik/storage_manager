@@ -20,6 +20,7 @@ function titleForPath(pathname: string) {
   if (pathname.startsWith("/reports")) return "Հաշվետվություններ";
   if (pathname.startsWith("/price-check")) return "Գնի հարցում";
   if (pathname.startsWith("/dashboard")) return "Flexit Դաշբորդ";
+  if (pathname.startsWith("/assistant")) return "AI Օգնական";
   if (pathname.startsWith("/password")) return "Գաղտնաբառ";
   if (pathname === "/") return "Գլխավոր էջ";
   return "Flexit տերմինալ";

@@ -33,6 +33,7 @@ class User extends Authenticatable implements FilamentUser
         'can_reports',
         'can_price_check',
         'can_dashboard',
+        'can_assistant',
     ];
 
     /**
@@ -44,12 +45,13 @@ class User extends Authenticatable implements FilamentUser
         'reports' => 'can_reports',
         'price_check' => 'can_price_check',
         'dashboard' => 'can_dashboard',
+        'assistant' => 'can_assistant',
     ];
 
     /**
      * Sections that stay hidden when their column has no value yet.
      */
-    private const SECTIONS_OFF_BY_DEFAULT = ['dashboard'];
+    private const SECTIONS_OFF_BY_DEFAULT = ['dashboard', 'assistant'];
 
     protected $appends = ['sections'];
 
@@ -80,6 +82,7 @@ class User extends Authenticatable implements FilamentUser
             'can_reports' => 'boolean',
             'can_price_check' => 'boolean',
             'can_dashboard' => 'boolean',
+            'can_assistant' => 'boolean',
         ];
     }
 

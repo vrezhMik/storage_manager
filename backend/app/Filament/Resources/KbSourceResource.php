@@ -1,0 +1,133 @@
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Resources\KbSourceResource\Pages;
+use App\Models\KbSource;
+use App\Services\Assistant\KnowledgeBase;
+use BackedEnum;
+use Filament\Actions;
+use Filament\Forms;
+use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Filament\Tables;
+use Filament\Tables\Table;
+use UnitEnum;
+
+class KbSourceResource extends Resource
+{
+    protected static ?string $model = KbSource::class;
+
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-book-open';
+
+    protected static string|UnitEnum|null $navigationGroup = 'AI';
+
+    protected static ?string $navigationLabel = 'Knowledge base';
+
+    protected static ?string $modelLabel = 'source';
+
+    protected static ?string $recordTitleAttribute = 'title';
+
+    public static function form(Schema $schema): Schema
+    {
+        return $schema->schema([
+            Forms\Components\TextInput::make('title')
+                ->label('Title')
+                ->helperText('Leave empty to use the page title')
+                ->maxLength(255),
+            Forms\Components\Radio::make('type')
+                ->label('Source')
+                ->options([
+                    KbSource::TYPE_URL => 'Web page (link)',
+                    KbSource::TYPE_FILE => 'File (.txt, .md, .html)',
+                ])
+                ->default(KbSource::TYPE_URL)
+                ->required()
+                ->live(),
+            Forms\Components\TextInput::make('url')
+                ->label('Link')
+                ->url()
+                ->maxLength(2048)
+                ->required(fn (Get $get) => $get('type') === KbSource::TYPE_URL)
+                ->visible(fn (Get $get) => $get('type') === KbSource::TYPE_URL),
+            Forms\Components\FileUpload::make('file_path')
+                ->label('File')
+                ->disk('local')
+                ->directory('kb')
+                ->preserveFilenames()
+                ->maxSize(10240)
+                ->required(fn (Get $get) => $get('type') === KbSource::TYPE_FILE)
+                ->visible(fn (Get $get) => $get('type') === KbSource::TYPE_FILE),
+        ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('title')
+                    ->searchable()
+                    ->limit(60)
+                    ->description(fn (KbSource $record) => $record->type === KbSource::TYPE_URL ? $record->url : $record->file_path),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state) => match ($state) {
+                        KbSource::STATUS_INDEXED => 'success',
+                        KbSource::STATUS_FAILED => 'danger',
+                        default => 'gray',
+                    })
+                    ->tooltip(fn (KbSource $record) => $record->error),
+                Tables\Columns\TextColumn::make('chunks_count')
+                    ->label('Chunks')
+                    ->numeric(),
+                Tables\Columns\TextColumn::make('indexed_at')
+                    ->dateTime()
+                    ->sortable(),
+            ])
+            ->defaultSort('id', 'desc')
+            ->actions([
+                Actions\Action::make('index')
+                    ->label('Index')
+                    ->icon('heroicon-o-arrow-path')
+                    ->action(fn (KbSource $record) => static::runIndex($record)),
+                Actions\EditAction::make()
+                    ->after(fn (KbSource $record) => static::runIndex($record)),
+                Actions\DeleteAction::make(),
+            ])
+            ->bulkActions([
+                Actions\DeleteBulkAction::make(),
+            ]);
+    }
+
+    /**
+     * Indexing runs right away (no queue worker yet); one page or file takes seconds.
+     */
+    public static function runIndex(KbSource $record): void
+    {
+        set_time_limit(600);
+        $record = app(KnowledgeBase::class)->index($record);
+
+        if ($record->status === KbSource::STATUS_INDEXED) {
+            Notification::make()
+                ->title('Indexed: '.$record->chunks_count.' chunks')
+                ->success()
+                ->send();
+        } else {
+            Notification::make()
+                ->title('Indexing failed')
+                ->body($record->error)
+                ->danger()
+                ->persistent()
+                ->send();
+        }
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ManageKbSources::route('/'),
+        ];
+    }
+}

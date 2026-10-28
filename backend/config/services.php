@@ -28,6 +28,15 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    // Local AI for the assistant (embeddings run on our own server).
+    'ollama' => [
+        'url' => env('OLLAMA_URL', 'http://127.0.0.1:11434'),
+        'embed_model' => env('OLLAMA_EMBED_MODEL', 'bge-m3'),
+        // Limit CPU use so the website stays responsive while embedding.
+        'num_thread' => (int) env('OLLAMA_NUM_THREAD', 2),
+        'timeout' => (int) env('OLLAMA_TIMEOUT', 120),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

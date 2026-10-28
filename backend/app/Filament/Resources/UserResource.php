@@ -70,6 +70,9 @@ class UserResource extends Resource
                     Forms\Components\Checkbox::make('can_dashboard')
                         ->label('Flexit Դաշբորդ (Dashboard)')
                         ->default(false),
+                    Forms\Components\Checkbox::make('can_assistant')
+                        ->label('AI Օգնական (Assistant, testing)')
+                        ->default(false),
                 ]),
             Forms\Components\Select::make('db_entry_id')
                 ->label('DB Config')
@@ -110,6 +113,7 @@ class UserResource extends Resource
                             'can_reports' => 'Հաշվետվություններ',
                             'can_price_check' => 'Գնի հարցում',
                             'can_dashboard' => 'Flexit Դաշբորդ',
+                            'can_assistant' => 'AI Օգնական',
                         ])->filter(fn ($label, $column) => (bool) $record->{$column})->values()->all())
                         ->badge()
                         ->placeholder('—'),

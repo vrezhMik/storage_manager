@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\OrderController;
 use Illuminate\Support\Facades\Route;
@@ -24,3 +25,4 @@ Route::middleware(['auth.jwt', 'section:reports'])->get('frozen-stock', [OrderCo
 Route::middleware(['auth.jwt', 'section:reports'])->get('abc', [OrderController::class, 'abc']);
 Route::middleware(['auth.jwt', 'section:reports'])->get('overdue-debts', [OrderController::class, 'overdueDebts']);
 Route::middleware(['auth.jwt', 'section:reports'])->get('sales-monthly', [OrderController::class, 'salesMonthly']);
+Route::middleware(['auth.jwt', 'section:assistant'])->post('assistant/search', [AssistantController::class, 'search']);
