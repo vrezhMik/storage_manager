@@ -37,13 +37,14 @@ class TranslateKbSource implements ShouldQueue
         }
 
         try {
-            $chunks = $source->chunks()->orderBy('position')->get()
-                ->filter(fn ($chunk) => TranslatorClient::detect($chunk->content) === 'ru');
-
+            // Clear old translations before loading the chunks: a new translation
+            // equal to the old one would otherwise look unchanged and not be saved.
             if ($this->fresh) {
                 $source->chunks()->update(['content_hy' => null]);
-                $chunks->each(fn ($chunk) => $chunk->content_hy = null);
             }
+
+            $chunks = $source->chunks()->orderBy('position')->get()
+                ->filter(fn ($chunk) => TranslatorClient::detect($chunk->content) === 'ru');
 
             if ($chunks->isEmpty()) {
                 $source->forceFill(['translation_status' => 'not_needed', 'translation_error' => null])->save();
