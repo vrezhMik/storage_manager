@@ -117,7 +117,10 @@ class KnowledgeBase
                 throw new RuntimeException('Cannot download the page ('.$response->status().')');
             }
 
-            return $this->extractor->fromHtml($response->body());
+            $document = $this->extractor->fromHtml($response->body());
+            $this->extractor->guardFramedPage($document, $response->body());
+
+            return $document;
         }
 
         if (! $source->file_path || ! Storage::disk('local')->exists($source->file_path)) {

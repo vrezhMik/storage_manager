@@ -22,6 +22,9 @@ class TextExtractor
     public function fromHtml(string $html): array
     {
         $html = $this->toUtf8($html);
+        // The text is UTF-8 now; an old <meta charset=windows-1251> would make
+        // libxml decode it a second time.
+        $html = preg_replace('/<meta[^>]+charset[^>]*>/i', '', $html);
 
         $dom = new DOMDocument();
         libxml_use_internal_errors(true);
@@ -58,11 +61,91 @@ class TextExtractor
             throw new RuntimeException('Cannot read the uploaded file');
         }
 
-        return match ($extension) {
+        $document = match ($extension) {
             'html', 'htm' => $this->fromHtml($content),
+            'mhtml', 'mht' => $this->fromMhtml($content),
             'txt', 'md' => $this->fromPlainText($this->toUtf8($content)),
-            default => throw new RuntimeException('Unsupported file type .'.$extension.' (use .txt, .md, .html)'),
+            default => throw new RuntimeException('Unsupported file type .'.$extension.' (use .mhtml, .html, .txt, .md)'),
         };
+
+        if (in_array($extension, ['html', 'htm'], true)) {
+            $this->guardFramedPage($document, $content);
+        }
+
+        return $document;
+    }
+
+    // Pages like ITS show the article in an <iframe>; saved or downloaded
+    // without it, only a few words of site menu are left.
+    private const FRAMED_PAGE_MIN_CHARS = 300;
+
+    public function guardFramedPage(array $document, string $html): void
+    {
+        $chars = array_sum(array_map(fn ($s) => mb_strlen($s['text']), $document['sections']));
+
+        if ($chars < self::FRAMED_PAGE_MIN_CHARS && stripos($html, '<iframe') !== false) {
+            throw new RuntimeException(
+                'The page text is inside a frame (e.g. ITS), so only the site menu was found. '
+                .'Save the page in Chrome as "Webpage, Single File" (.mhtml) and upload that file, '
+                .'or upload "..._files/saved_resource.html" from the saved folder.'
+            );
+        }
+    }
+
+    /**
+     * "Webpage, Single File" (.mhtml) saved by Chrome/Edge: a MIME archive with
+     * the page and its frames. Frames hold the real text on sites like ITS, so
+     * the frame parts are used and the outer page (the one with the <iframe>)
+     * only when it is the sole HTML part.
+     *
+     * @return array{title: string|null, sections: array<int, array{heading: string|null, text: string}>}
+     */
+    public function fromMhtml(string $content): array
+    {
+        if (! preg_match('/boundary="?([^";\r\n]+)"?/i', $content, $m)) {
+            throw new RuntimeException('Not a valid .mhtml file (no MIME boundary)');
+        }
+
+        $parts = [];
+        foreach (explode('--'.$m[1], $content) as $part) {
+            $split = preg_split('/\r?\n\r?\n/', $part, 2);
+            if (count($split) < 2 || ! preg_match('/content-type:\s*text\/html/i', $split[0])) {
+                continue;
+            }
+
+            [$headers, $body] = $split;
+            if (preg_match('/content-transfer-encoding:\s*quoted-printable/i', $headers)) {
+                $body = quoted_printable_decode($body);
+            } elseif (preg_match('/content-transfer-encoding:\s*base64/i', $headers)) {
+                $body = (string) base64_decode(preg_replace('/\s+/', '', $body));
+            }
+
+            if (preg_match('/charset="?([\w-]+)"?/i', $headers, $cs) && strcasecmp($cs[1], 'utf-8') !== 0) {
+                $body = mb_convert_encoding($body, 'UTF-8', $cs[1]);
+            }
+
+            $parts[] = ['html' => $body, 'outer' => stripos($body, '<iframe') !== false];
+        }
+
+        if ($parts === []) {
+            throw new RuntimeException('No HTML found inside the .mhtml file');
+        }
+
+        $frames = array_values(array_filter($parts, fn ($p) => ! $p['outer']));
+        $use = $frames !== [] ? $frames : $parts;
+
+        $title = null;
+        $sections = [];
+        foreach ($use as $part) {
+            $document = $this->fromHtml($part['html']);
+            $title ??= $document['title'];
+            array_push($sections, ...$document['sections']);
+        }
+
+        // The outer page usually has the best title (frames may have none).
+        $title ??= $this->fromHtml($parts[0]['html'])['title'];
+
+        return ['title' => $title, 'sections' => $sections];
     }
 
     /**

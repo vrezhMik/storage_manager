@@ -41,7 +41,7 @@ class KbSourceResource extends Resource
                 ->label('Source')
                 ->options([
                     KbSource::TYPE_URL => 'Web page (link)',
-                    KbSource::TYPE_FILE => 'File (.txt, .md, .html)',
+                    KbSource::TYPE_FILE => 'File (.mhtml, .html, .txt, .md)',
                 ])
                 ->default(KbSource::TYPE_URL)
                 ->required()
