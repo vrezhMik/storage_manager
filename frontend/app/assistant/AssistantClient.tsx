@@ -9,6 +9,8 @@ export type AssistantResult = {
   relevant?: boolean;
   heading: string | null;
   content: string;
+  // Whole section around the matching chunk (newer API); falls back to content.
+  section?: string;
   source: { id: number; title: string; type: "url" | "file"; url: string | null };
 };
 
@@ -25,8 +27,14 @@ const COLLAPSED_CHARS = 420;
 
 function ResultCard({ result, rank }: { result: AssistantResult; rank: number }) {
   const [open, setOpen] = useState(false);
-  const long = result.content.length > COLLAPSED_CHARS;
-  const text = open || !long ? result.content : `${result.content.slice(0, COLLAPSED_CHARS).trimEnd()}…`;
+  const full = result.section && result.section.length > result.content.length ? result.section : result.content;
+  // Collapsed: the matching part, cut at a word boundary. Open: the whole section.
+  const snippet =
+    result.content.length > COLLAPSED_CHARS
+      ? `${result.content.slice(0, COLLAPSED_CHARS).replace(/\s+\S*$/, "")}…`
+      : result.content;
+  const long = full.length > snippet.length;
+  const text = open ? full : snippet;
   const relevance = Math.max(0, Math.min(100, Math.round(result.score * 100)));
 
   return (

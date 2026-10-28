@@ -74,13 +74,23 @@ class KnowledgeBase
     /**
      * @return array<int, array{chunk: KbChunk, score: float}>
      */
+    // Longest section text returned with a hit (characters).
+    private const SECTION_MAX_CHARS = 8000;
+
+    /**
+     * Best matching sections: hits from the same section are merged into one
+     * result that carries the whole section text, not just the matching chunk.
+     *
+     * @return array<int, array{chunk: KbChunk, score: float, section: string}>
+     */
     public function search(string $question, int $limit = 6): array
     {
         $query = $this->ollama->embed([$question])[0];
+        $keep = $limit * 5;
         $best = [];
 
         // Brute-force cosine similarity: fine for a test-sized knowledge base.
-        KbChunk::query()->select(['id', 'embedding'])->orderBy('id')->chunk(500, function ($rows) use ($query, &$best, $limit) {
+        KbChunk::query()->select(['id', 'embedding'])->orderBy('id')->chunk(500, function ($rows) use ($query, &$best, $keep) {
             foreach ($rows as $row) {
                 $vector = KbChunk::unpackVector($row->embedding);
                 $score = 0.0;
@@ -90,17 +100,69 @@ class KnowledgeBase
                 $best[$row->id] = $score;
             }
             arsort($best);
-            $best = array_slice($best, 0, $limit * 3, true);
+            $best = array_slice($best, 0, $keep, true);
         });
 
         arsort($best);
-        $ids = array_slice(array_keys($best), 0, $limit);
-        $chunks = KbChunk::with('source:id,title,type,url')->whereIn('id', $ids)->get()->keyBy('id');
+        $chunks = KbChunk::with('source:id,title,type,url')->whereIn('id', array_keys($best))->get()->keyBy('id');
 
-        return array_values(array_filter(array_map(
-            fn ($id) => isset($chunks[$id]) ? ['chunk' => $chunks[$id], 'score' => $best[$id]] : null,
-            $ids,
-        )));
+        // One result per section (source + heading), in score order.
+        $hits = [];
+        foreach ($best as $id => $score) {
+            $chunk = $chunks[$id] ?? null;
+            if (! $chunk) {
+                continue;
+            }
+            $key = $chunk->kb_source_id.'|'.$chunk->heading;
+            if (! isset($hits[$key])) {
+                $hits[$key] = ['chunk' => $chunk, 'score' => $score];
+            }
+            if (count($hits) >= $limit) {
+                break;
+            }
+        }
+
+        return array_values(array_map(fn (array $hit) => $hit + [
+            'section' => $this->sectionText($hit['chunk']),
+        ], $hits));
+    }
+
+    /**
+     * All chunks of the hit's section, joined in order (centred on the hit
+     * when the section is longer than SECTION_MAX_CHARS).
+     */
+    private function sectionText(KbChunk $hit): string
+    {
+        $parts = KbChunk::query()
+            ->where('kb_source_id', $hit->kb_source_id)
+            ->where('heading', $hit->heading)
+            ->orderBy('position')
+            ->get(['position', 'content']);
+
+        // Grow outwards from the matching chunk until the size limit.
+        $index = $parts->search(fn ($p) => $p->position === $hit->position) ?: 0;
+        $from = $to = $index;
+        $length = mb_strlen($parts[$index]->content ?? $hit->content);
+        while (true) {
+            $grew = false;
+            foreach ([$from - 1, $to + 1] as $next) {
+                if (! isset($parts[$next]) || $length + mb_strlen($parts[$next]->content) > self::SECTION_MAX_CHARS) {
+                    continue;
+                }
+                $length += mb_strlen($parts[$next]->content);
+                if ($next < $from) {
+                    $from = $next;
+                } else {
+                    $to = $next;
+                }
+                $grew = true;
+            }
+            if (! $grew) {
+                break;
+            }
+        }
+
+        return $parts->slice($from, $to - $from + 1)->pluck('content')->implode("\n");
     }
 
     /**
@@ -131,8 +193,10 @@ class KnowledgeBase
     }
 
     /**
-     * Splits sections into ~CHUNK_SIZE pieces. The text sent for embedding
-     * starts with the document title and section heading for context.
+     * Splits sections into ~CHUNK_SIZE pieces at sentence/line boundaries.
+     * Stored chunks do not overlap, so a section can be rebuilt by joining
+     * them; the overlap (end of the previous chunk) only goes into the text
+     * sent for embedding, together with the document title and heading.
      *
      * @param  array<int, array{heading: string|null, text: string}>  $sections
      * @return array<int, array{heading: string|null, content: string, embed_text: string}>
@@ -142,33 +206,61 @@ class KnowledgeBase
         $chunks = [];
 
         foreach ($sections as $section) {
-            $paragraphs = preg_split('/\n+/u', $section['text']);
-            $buffer = '';
-
-            foreach ($paragraphs as $paragraph) {
+            $pieces = [];
+            foreach (preg_split('/\n+/u', $section['text']) as $paragraph) {
                 // Very long paragraphs are cut by sentences.
-                $pieces = mb_strlen($paragraph) > self::CHUNK_SIZE
-                    ? preg_split('/(?<=[.!?։])\s+/u', $paragraph)
-                    : [$paragraph];
-
-                foreach ($pieces as $piece) {
-                    if ($buffer !== '' && mb_strlen($buffer) + mb_strlen($piece) > self::CHUNK_SIZE) {
-                        $chunks[] = $this->makeChunk($title, $section['heading'], $buffer);
-                        $buffer = mb_substr($buffer, -self::CHUNK_OVERLAP);
-                    }
-                    $buffer = trim($buffer."\n".$piece);
-                }
+                array_push($pieces, ...(mb_strlen($paragraph) > self::CHUNK_SIZE
+                    ? preg_split('/(?<=[.!?։:;])\s+/u', $paragraph)
+                    : [$paragraph]));
             }
 
-            if (trim($buffer) !== '') {
-                $chunks[] = $this->makeChunk($title, $section['heading'], $buffer);
+            $buffer = [];
+            $length = 0;
+            $previousTail = '';
+            foreach ($pieces as $piece) {
+                $piece = trim($piece);
+                if ($piece === '') {
+                    continue;
+                }
+                if ($buffer !== [] && $length + mb_strlen($piece) > self::CHUNK_SIZE) {
+                    $chunks[] = $this->makeChunk($title, $section['heading'], implode("\n", $buffer), $previousTail);
+                    $previousTail = $this->tail($buffer);
+                    $buffer = [];
+                    $length = 0;
+                }
+                $buffer[] = $piece;
+                $length += mb_strlen($piece) + 1;
+            }
+
+            if ($buffer !== []) {
+                $chunks[] = $this->makeChunk($title, $section['heading'], implode("\n", $buffer), $previousTail);
             }
         }
 
         return $chunks;
     }
 
-    private function makeChunk(?string $title, ?string $heading, string $content): array
+    /**
+     * Last whole sentences / lines of a chunk, up to CHUNK_OVERLAP characters.
+     *
+     * @param  string[]  $pieces
+     */
+    private function tail(array $pieces): string
+    {
+        $tail = [];
+        $length = 0;
+        foreach (array_reverse($pieces) as $piece) {
+            if ($length + mb_strlen($piece) > self::CHUNK_OVERLAP && $tail !== []) {
+                break;
+            }
+            array_unshift($tail, $piece);
+            $length += mb_strlen($piece);
+        }
+
+        return mb_substr(implode(' ', $tail), -self::CHUNK_OVERLAP * 2);
+    }
+
+    private function makeChunk(?string $title, ?string $heading, string $content, string $previousTail = ''): array
     {
         $content = trim($content);
         $context = implode(' — ', array_filter([$title, $heading]));
@@ -176,7 +268,7 @@ class KnowledgeBase
         return [
             'heading' => $heading,
             'content' => $content,
-            'embed_text' => $context !== '' ? $context."\n".$content : $content,
+            'embed_text' => implode("\n", array_filter([$context, $previousTail, $content], fn ($s) => $s !== '')),
         ];
     }
 }

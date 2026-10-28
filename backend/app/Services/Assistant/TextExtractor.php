@@ -16,6 +16,9 @@ class TextExtractor
 {
     private const BLOCK_TAGS = ['p', 'li', 'td', 'th', 'pre', 'blockquote', 'dd', 'dt', 'div'];
 
+    // "3.4.6. Title" (at least two numbers), short, not ending with a full stop.
+    private const NUMBERED_HEADING = '/^\d+(\.\d+)+\.?\s+\S.{0,118}(?<![.:;,])$/u';
+
     /**
      * @return array{title: string|null, sections: array<int, array{heading: string|null, text: string}>}
      */
@@ -196,6 +199,13 @@ class TextExtractor
 
             if (in_array($tag, self::BLOCK_TAGS, true) || in_array($tag, ['ul', 'ol', 'table', 'tr', 'section', 'span', 'a', 'b', 'strong'], true)) {
                 $text = $this->clean($child->textContent);
+                // ITS writes sub-headings like "3.4.6. Бонусные программы" as plain
+                // paragraphs; treat such short numbered lines as headings.
+                if ($tag !== 'li' && preg_match(self::NUMBERED_HEADING, $text)) {
+                    $this->flush($sections, $current);
+                    $current = ['heading' => $text, 'lines' => []];
+                    continue;
+                }
                 if ($text !== '') {
                     $current['lines'][] = $tag === 'li' ? '• '.$text : $text;
                 }

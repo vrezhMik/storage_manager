@@ -46,6 +46,7 @@ class AssistantController extends Controller
                 'relevant' => $hit['score'] >= $minScore,
                 'heading' => $hit['chunk']->heading,
                 'content' => $hit['chunk']->content,
+                'section' => $hit['section'],
                 'source' => [
                     'id' => $hit['chunk']->source->id,
                     'title' => $hit['chunk']->source->title,
