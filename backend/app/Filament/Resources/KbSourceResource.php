@@ -4,7 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\KbSourceResource\Pages;
 use App\Models\KbSource;
+use App\Jobs\TranslateKbSource;
 use App\Services\Assistant\KnowledgeBase;
+use App\Services\Assistant\TranslatorClient;
 use BackedEnum;
 use Filament\Actions;
 use Filament\Forms;
@@ -83,13 +85,33 @@ class KbSourceResource extends Resource
                 Tables\Columns\TextColumn::make('chunks_count')
                     ->label('Chunks')
                     ->numeric(),
+                Tables\Columns\TextColumn::make('translation_status')
+                    ->label('Armenian')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state) => match ($state) {
+                        'done' => 'translated',
+                        'pending' => 'translating…',
+                        'failed' => 'failed',
+                        'not_needed' => 'already hy',
+                        default => '—',
+                    })
+                    ->color(fn (?string $state) => match ($state) {
+                        'done', 'not_needed' => 'success',
+                        'failed' => 'danger',
+                        default => 'gray',
+                    })
+                    ->tooltip(fn (KbSource $record) => $record->translation_error)
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('indexed_at')
                     ->dateTime()
                     ->sortable(),
             ])
             ->defaultSort('id', 'desc')
             // Refresh while background indexing is still running.
-            ->poll(fn () => KbSource::query()->where('status', KbSource::STATUS_PENDING)->exists() ? '5s' : null)
+            ->poll(fn () => KbSource::query()
+                ->where('status', KbSource::STATUS_PENDING)
+                ->orWhere('translation_status', 'pending')
+                ->exists() ? '5s' : null)
             ->actions([
                 Actions\Action::make('index')
                     ->label('Index')
@@ -104,6 +126,18 @@ class KbSourceResource extends Resource
                     ->label('Index selected')
                     ->icon('heroicon-o-arrow-path')
                     ->action(fn (Collection $records) => static::runIndexMany($records))
+                    ->deselectRecordsAfterCompletion(),
+                Actions\BulkAction::make('translateSelected')
+                    ->label('Translate to Armenian')
+                    ->icon('heroicon-o-language')
+                    ->visible(fn () => app(TranslatorClient::class)->enabled())
+                    ->action(function (Collection $records) {
+                        foreach ($records->where('status', KbSource::STATUS_INDEXED) as $record) {
+                            $record->forceFill(['translation_status' => 'pending', 'translation_error' => null])->save();
+                            TranslateKbSource::dispatch($record->id);
+                        }
+                        Notification::make()->title('Translation started in the background')->success()->send();
+                    })
                     ->deselectRecordsAfterCompletion(),
                 Actions\DeleteBulkAction::make(),
             ]);

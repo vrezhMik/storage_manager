@@ -12,6 +12,7 @@ class KbChunk extends Model
         'position',
         'heading',
         'content',
+        'content_hy',
         'embedding',
     ];
 

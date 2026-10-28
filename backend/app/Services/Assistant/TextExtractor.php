@@ -19,6 +19,50 @@ class TextExtractor
     // "3.4.6. Title" (at least two numbers), short, not ending with a full stop.
     private const NUMBERED_HEADING = '/^\d+(\.\d+)+\.?\s+\S.{0,118}(?<![.:;,])$/u';
 
+    // Pictures are kept in the text as their own line: [[img:relative/path.png]].
+    public const IMAGE_MARKER = '/\[\[img:([^\]\n]+)\]\]/u';
+    public const IMAGE_LINE = '/^\s*\[\[img:[^\]\n]+\]\]\s*$/u';
+
+    public static function stripImages(string $text): string
+    {
+        return trim(preg_replace("/\n{2,}/", "\n", preg_replace(self::IMAGE_MARKER, '', $text)));
+    }
+
+    /**
+     * Marker for an <img src>, or null for images we cannot show later
+     * (inline data, tracking pixels, paths leaving the saved folder).
+     */
+    public static function imageMarker(string $src): ?string
+    {
+        $src = trim(html_entity_decode($src, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        if ($src === '' || str_starts_with($src, 'data:')) {
+            return null;
+        }
+        if (! preg_match('#^https?://#i', $src)) {
+            $src = rawurldecode(preg_replace('/[?#].*$/', '', $src));
+            $src = preg_replace('#^\./#', '', str_replace('\\', '/', $src));
+            if ($src === '' || str_starts_with($src, '/') || str_contains($src, '..')) {
+                return null;
+            }
+        }
+        if (! preg_match('/\.(png|jpe?g|gif|webp|svg)(\?|$)/i', $src) || preg_match('/(avatar|logo|icon|pixel|24px)/i', basename($src))) {
+            return null;
+        }
+
+        return '[[img:'.str_replace([']', "\n"], '', $src).']]';
+    }
+
+    private function addImages(DOMElement $element, array &$current): void
+    {
+        $images = strtolower($element->tagName) === 'img' ? [$element] : iterator_to_array($element->getElementsByTagName('img'));
+        foreach ($images as $img) {
+            $marker = self::imageMarker((string) $img->getAttribute('src'));
+            if ($marker !== null) {
+                $current['lines'][] = $marker;
+            }
+        }
+    }
+
     /**
      * @return array{title: string|null, sections: array<int, array{heading: string|null, text: string}>}
      */
@@ -209,6 +253,12 @@ class TextExtractor
                 if ($text !== '') {
                     $current['lines'][] = $tag === 'li' ? '• '.$text : $text;
                 }
+                $this->addImages($child, $current);
+                continue;
+            }
+
+            if ($tag === 'img') {
+                $this->addImages($child, $current);
                 continue;
             }
 

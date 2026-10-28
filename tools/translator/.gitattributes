@@ -1,0 +1,2 @@
+# Run on Linux: keep Unix line endings even when committed from Windows.
+* text eol=lf

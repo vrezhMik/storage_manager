@@ -7,11 +7,44 @@ use App\Models\KbSource;
 use App\Services\Assistant\KnowledgeBase;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 class AssistantController extends Controller
 {
+    /**
+     * A picture referenced from a source's text ([[img:path]]), relative to
+     * the folder of the source file. ?path=image246.png
+     */
+    public function image(Request $request, KbSource $source): Response
+    {
+        $relative = str_replace('\\', '/', (string) $request->query('path', ''));
+
+        if ($source->type !== KbSource::TYPE_FILE
+            || ! $source->file_path
+            || $relative === ''
+            || str_contains($relative, '..')
+            || str_starts_with($relative, '/')
+            || ! preg_match('/\.(png|jpe?g|gif|webp|svg)$/i', $relative)) {
+            abort(404);
+        }
+
+        $path = trim(dirname($source->file_path), '/').'/'.$relative;
+        $disk = Storage::disk('kb');
+
+        if (! $disk->exists($path)) {
+            abort(404);
+        }
+
+        return response()->file($disk->path($path), [
+            'Cache-Control' => 'private, max-age=86400',
+            // SVG files could carry scripts; never run them.
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'",
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
     public function search(Request $request, KnowledgeBase $knowledgeBase): JsonResponse
     {
         $question = trim((string) $request->input('question', ''));
@@ -46,7 +79,9 @@ class AssistantController extends Controller
                 'relevant' => $hit['score'] >= $minScore,
                 'heading' => $hit['chunk']->heading,
                 'content' => $hit['chunk']->content,
+                'content_hy' => $hit['chunk']->content_hy,
                 'section' => $hit['section'],
+                'section_hy' => $hit['section_hy'],
                 'source' => [
                     'id' => $hit['chunk']->source->id,
                     'title' => $hit['chunk']->source->title,

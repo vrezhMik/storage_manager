@@ -9,10 +9,58 @@ export type AssistantResult = {
   relevant?: boolean;
   heading: string | null;
   content: string;
+  // Armenian translation of content / section when the source was translated.
+  content_hy?: string | null;
   // Whole section around the matching chunk (newer API); falls back to content.
   section?: string;
+  section_hy?: string | null;
   source: { id: number; title: string; type: "url" | "file"; url: string | null };
 };
+
+// Pictures live in the text as their own line: [[img:relative/path.png]].
+const IMAGE_MARKER = /\[\[img:([^\]\n]+)\]\]/g;
+
+const stripImages = (text: string) => text.replace(IMAGE_MARKER, "").replace(/\n{2,}/g, "\n").trim();
+
+const countImages = (text: string) => (text.match(IMAGE_MARKER) ?? []).length;
+
+const imageUrl = (sourceId: number, path: string) =>
+  /^https?:\/\//i.test(path)
+    ? path
+    : `${API_BASE}/assistant/image/${sourceId}?path=${encodeURIComponent(path)}`;
+
+// Text with its pictures in place; a picture that cannot be loaded is hidden.
+function RichText({ text, sourceId }: { text: string; sourceId: number }) {
+  const parts = text.split(/(\[\[img:[^\]\n]+\]\])/);
+  return (
+    <div className="space-y-2 text-sm text-foreground break-words">
+      {parts.map((part, idx) => {
+        const image = part.match(/^\[\[img:([^\]\n]+)\]\]$/);
+        if (image) {
+          return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={idx}
+              src={imageUrl(sourceId, image[1])}
+              alt=""
+              loading="lazy"
+              className="max-w-full rounded-md border border-border"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          );
+        }
+        const trimmed = part.replace(/^\n+|\n+$/g, "");
+        return trimmed ? (
+          <p key={idx} className="whitespace-pre-line">
+            {trimmed}
+          </p>
+        ) : null;
+      })}
+    </div>
+  );
+}
 
 export type AssistantResponse = { question: string; min_score?: number; results: AssistantResult[] };
 
@@ -27,14 +75,20 @@ const COLLAPSED_CHARS = 420;
 
 function ResultCard({ result, rank }: { result: AssistantResult; rank: number }) {
   const [open, setOpen] = useState(false);
-  const full = result.section && result.section.length > result.content.length ? result.section : result.content;
-  // Collapsed: the matching part, cut at a word boundary. Open: the whole section.
+  const hasArmenian = Boolean(result.content_hy || result.section_hy);
+  const [armenian, setArmenian] = useState(true);
+  const showArmenian = hasArmenian && armenian;
+
+  const content = (showArmenian ? result.content_hy : null) ?? result.content;
+  const section = (showArmenian ? result.section_hy : null) ?? result.section ?? "";
+  const full = section.length > content.length ? section : content;
+  // Collapsed: the matching part without pictures, cut at a word boundary.
+  // Open: the whole section with its pictures.
+  const plain = stripImages(content);
   const snippet =
-    result.content.length > COLLAPSED_CHARS
-      ? `${result.content.slice(0, COLLAPSED_CHARS).replace(/\s+\S*$/, "")}…`
-      : result.content;
-  const long = full.length > snippet.length;
-  const text = open ? full : snippet;
+    plain.length > COLLAPSED_CHARS ? `${plain.slice(0, COLLAPSED_CHARS).replace(/\s+\S*$/, "")}…` : plain;
+  const images = countImages(full);
+  const long = stripImages(full).length > snippet.length || images > 0;
   const relevance = Math.max(0, Math.min(100, Math.round(result.score * 100)));
 
   return (
@@ -55,11 +109,25 @@ function ResultCard({ result, rank }: { result: AssistantResult; rank: number })
           {relevance}%
         </span>
       </div>
-      <p className="whitespace-pre-line text-sm text-foreground break-words">{text}</p>
+      {open ? (
+        <RichText text={full} sourceId={result.source.id} />
+      ) : (
+        <p className="whitespace-pre-line text-sm text-foreground break-words">{snippet}</p>
+      )}
       <div className="flex flex-wrap items-center gap-3 text-xs">
         {long && (
           <button type="button" onClick={() => setOpen((v) => !v)} className="font-medium text-primary hover:underline">
-            {open ? "Ավելի քիչ" : "Կարդալ ամբողջը"}
+            {open ? "Ավելի քիչ" : `Կարդալ ամբողջը${images > 0 ? ` · 📷 ${images}` : ""}`}
+          </button>
+        )}
+        {hasArmenian && (
+          <button
+            type="button"
+            onClick={() => setArmenian((v) => !v)}
+            className="font-medium text-muted-foreground hover:text-foreground hover:underline"
+            title="Ավտոմատ թարգմանություն. կասկածի դեպքում նայեք բնօրինակը"
+          >
+            {showArmenian ? "Բնօրինակ (ru)" : "Հայերեն"}
           </button>
         )}
         {result.source.url && (

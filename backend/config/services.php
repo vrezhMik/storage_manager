@@ -37,6 +37,12 @@ return [
         'timeout' => (int) env('OLLAMA_TIMEOUT', 120),
     ],
 
+    // Local translator for the assistant (tools/translator). Empty URL = off.
+    'translator' => [
+        'url' => env('TRANSLATOR_URL', ''),
+        'timeout' => (int) env('TRANSLATOR_TIMEOUT', 600),
+    ],
+
     'assistant' => [
         // Chunks scoring below this (cosine similarity, 0..1) are not shown as
         // answers; bge-m3 gives roughly 0.55+ for related text.

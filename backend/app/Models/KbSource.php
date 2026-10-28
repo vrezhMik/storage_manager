@@ -23,12 +23,16 @@ class KbSource extends Model
         'error',
         'chunks_count',
         'indexed_at',
+        'translation_status',
+        'translation_error',
+        'translated_at',
     ];
 
     protected function casts(): array
     {
         return [
             'indexed_at' => 'datetime',
+            'translated_at' => 'datetime',
         ];
     }
 

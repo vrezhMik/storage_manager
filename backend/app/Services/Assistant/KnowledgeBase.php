@@ -2,6 +2,7 @@
 
 namespace App\Services\Assistant;
 
+use App\Jobs\TranslateKbSource;
 use App\Models\KbChunk;
 use App\Models\KbSource;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,7 @@ class KnowledgeBase
     public function __construct(
         private readonly OllamaClient $ollama,
         private readonly TextExtractor $extractor,
+        private readonly TranslatorClient $translator,
     ) {}
 
     public function index(KbSource $source): KbSource
@@ -60,7 +62,15 @@ class KnowledgeBase
                 'error' => null,
                 'chunks_count' => count($chunks),
                 'indexed_at' => now(),
+                // New chunks: any earlier translation is gone.
+                'translation_status' => $this->translator->enabled() ? 'pending' : null,
+                'translation_error' => null,
+                'translated_at' => null,
             ])->save();
+
+            if ($this->translator->enabled()) {
+                TranslateKbSource::dispatch($source->id);
+            }
         } catch (Throwable $e) {
             $source->fill([
                 'status' => KbSource::STATUS_FAILED,
@@ -81,7 +91,7 @@ class KnowledgeBase
      * Best matching sections: hits from the same section are merged into one
      * result that carries the whole section text, not just the matching chunk.
      *
-     * @return array<int, array{chunk: KbChunk, score: float, section: string}>
+     * @return array<int, array{chunk: KbChunk, score: float, section: string, section_hy: string|null}>
      */
     public function search(string $question, int $limit = 6): array
     {
@@ -122,22 +132,23 @@ class KnowledgeBase
             }
         }
 
-        return array_values(array_map(fn (array $hit) => $hit + [
-            'section' => $this->sectionText($hit['chunk']),
-        ], $hits));
+        return array_values(array_map(fn (array $hit) => $hit + $this->sectionText($hit['chunk']), $hits));
     }
 
     /**
      * All chunks of the hit's section, joined in order (centred on the hit
-     * when the section is longer than SECTION_MAX_CHARS).
+     * when the section is longer than SECTION_MAX_CHARS). section_hy is the
+     * Armenian version where chunks were translated (null if none were).
+     *
+     * @return array{section: string, section_hy: string|null}
      */
-    private function sectionText(KbChunk $hit): string
+    private function sectionText(KbChunk $hit): array
     {
         $parts = KbChunk::query()
             ->where('kb_source_id', $hit->kb_source_id)
             ->where('heading', $hit->heading)
             ->orderBy('position')
-            ->get(['position', 'content']);
+            ->get(['position', 'content', 'content_hy']);
 
         // Grow outwards from the matching chunk until the size limit.
         $index = $parts->search(fn ($p) => $p->position === $hit->position) ?: 0;
@@ -162,7 +173,14 @@ class KnowledgeBase
             }
         }
 
-        return $parts->slice($from, $to - $from + 1)->pluck('content')->implode("\n");
+        $slice = $parts->slice($from, $to - $from + 1);
+
+        return [
+            'section' => $slice->pluck('content')->implode("\n"),
+            'section_hy' => $slice->contains(fn ($p) => $p->content_hy !== null)
+                ? $slice->map(fn ($p) => $p->content_hy ?? $p->content)->implode("\n")
+                : null,
+        ];
     }
 
     /**
@@ -268,7 +286,10 @@ class KnowledgeBase
         return [
             'heading' => $heading,
             'content' => $content,
-            'embed_text' => implode("\n", array_filter([$context, $previousTail, $content], fn ($s) => $s !== '')),
+            // Image markers carry no meaning for search.
+            'embed_text' => TextExtractor::stripImages(
+                implode("\n", array_filter([$context, $previousTail, $content], fn ($s) => $s !== ''))
+            ),
         ];
     }
 }

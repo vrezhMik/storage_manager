@@ -15,6 +15,8 @@ class SourceImporter
 {
     public const DOCUMENT_EXTENSIONS = ['mhtml', 'mht', 'html', 'htm', 'txt', 'md'];
 
+    public const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'];
+
     private const MAX_ARCHIVE_ENTRIES = 2000;
 
     /**
@@ -73,7 +75,9 @@ class SourceImporter
                 continue;
             }
             $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-            if (! in_array($extension, self::DOCUMENT_EXTENSIONS, true)) {
+            $isDocument = in_array($extension, self::DOCUMENT_EXTENSIONS, true);
+            // Pictures are kept next to the pages so answers can show them.
+            if (! $isDocument && ! in_array($extension, self::IMAGE_EXTENSIONS, true)) {
                 continue;
             }
             $content = $zip->getFromIndex($i);
@@ -82,7 +86,9 @@ class SourceImporter
             }
             $target = $folder.'/'.$name;
             $disk->put($target, $content);
-            $files[$name] = $target;
+            if ($isDocument) {
+                $files[$name] = $target;
+            }
         }
         $zip->close();
         $disk->delete($path);
@@ -101,11 +107,11 @@ class SourceImporter
     private function createSources(array $files): array
     {
         $disk = Storage::disk('kb');
-        $used = [];
+        $usedFolders = [];
         $sources = [];
 
         foreach ($files as $name => $stored) {
-            if (isset($used[$name]) || preg_match('#_files/#i', $name)) {
+            if (preg_match('#_files/#i', $name)) {
                 continue;
             }
 
@@ -117,7 +123,7 @@ class SourceImporter
                 $prefix = substr($name, 0, -strlen($extension) - 1).'_files/';
                 $frame = $this->largestFrame($files, $prefix);
                 if ($frame !== null) {
-                    $used[$frame] = true;
+                    $usedFolders[$prefix] = true;
                     $source = $files[$frame];
                     $title = $this->titleOf($disk->get($stored)) ?? '';
                 }
@@ -131,16 +137,20 @@ class SourceImporter
             ]);
         }
 
-        // Frames whose outer page was not in the archive still count.
+        // A "_files" folder whose outer page was not in the archive still
+        // counts: its largest page is the article (the rest are helpers).
         foreach ($files as $name => $stored) {
-            if (! isset($used[$name]) && preg_match('#_files/[^/]+\.html?$#i', $name)) {
-                $sources[] = KbSource::create([
-                    'title' => '',
-                    'type' => KbSource::TYPE_FILE,
-                    'file_path' => $stored,
-                    'status' => KbSource::STATUS_PENDING,
-                ]);
+            if (! preg_match('#^(.*_files/)[^/]+\.html?$#i', $name, $m) || isset($usedFolders[$m[1]])) {
+                continue;
             }
+            $usedFolders[$m[1]] = true;
+            $frame = $this->largestFrame($files, $m[1]);
+            $sources[] = KbSource::create([
+                'title' => '',
+                'type' => KbSource::TYPE_FILE,
+                'file_path' => $files[$frame],
+                'status' => KbSource::STATUS_PENDING,
+            ]);
         }
 
         if ($sources === []) {
