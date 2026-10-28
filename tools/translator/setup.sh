@@ -5,6 +5,8 @@
 #   bash tools/translator/setup.sh 1.2B       # M2M100 1.2B (MIT, better, ~1.3 GB RAM)
 #   bash tools/translator/setup.sh nllb       # NLLB 600M (best for Armenian, NON-COMMERCIAL licence)
 #
+# Running it again with another choice switches the model (pm2 restart translator).
+#
 # Needs: sudo apt install -y python3-venv   (once)
 set -euo pipefail
 
@@ -31,8 +33,11 @@ if [ ! -f "$MODEL_DIR/model.bin" ]; then
   # Conversion tools are only needed once and are removed afterwards.
   "$VENV/bin/pip" install --index-url https://download.pytorch.org/whl/cpu torch
   "$VENV/bin/pip" install "transformers[sentencepiece]" protobuf
+  # Loading in float16 with low memory use halves the RAM needed, so even the
+  # 1.2B model converts on a 4 GB server with swap.
   "$VENV/bin/ct2-transformers-converter" --model "$HF_MODEL" --output_dir "$MODEL_DIR" \
-    --quantization int8 --copy_files sentencepiece.bpe.model
+    --quantization int8 --copy_files sentencepiece.bpe.model \
+    --low_cpu_mem_usage --load_as_float16
   "$VENV/bin/pip" uninstall -y torch transformers >/dev/null || true
   rm -rf "$HOME/.cache/huggingface"
 fi
