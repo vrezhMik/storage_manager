@@ -24,7 +24,10 @@ class TranslateKbSource implements ShouldQueue
     // Chunks sent to the translator per request.
     private const BATCH = 4;
 
-    public function __construct(public int $sourceId) {}
+    /**
+     * @param  bool  $fresh  translate again even chunks that already have a translation
+     */
+    public function __construct(public int $sourceId, public bool $fresh = false) {}
 
     public function handle(TranslatorClient $translator): void
     {
@@ -36,6 +39,11 @@ class TranslateKbSource implements ShouldQueue
         try {
             $chunks = $source->chunks()->orderBy('position')->get()
                 ->filter(fn ($chunk) => TranslatorClient::detect($chunk->content) === 'ru');
+
+            if ($this->fresh) {
+                $source->chunks()->update(['content_hy' => null]);
+                $chunks->each(fn ($chunk) => $chunk->content_hy = null);
+            }
 
             if ($chunks->isEmpty()) {
                 $source->forceFill(['translation_status' => 'not_needed', 'translation_error' => null])->save();

@@ -134,7 +134,7 @@ class KbSourceResource extends Resource
                     ->action(function (Collection $records) {
                         foreach ($records->where('status', KbSource::STATUS_INDEXED) as $record) {
                             $record->forceFill(['translation_status' => 'pending', 'translation_error' => null])->save();
-                            TranslateKbSource::dispatch($record->id);
+                            TranslateKbSource::dispatch($record->id, fresh: true);
                         }
                         Notification::make()->title('Translation started in the background')->success()->send();
                     })

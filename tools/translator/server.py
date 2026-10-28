@@ -49,31 +49,63 @@ translator = ctranslate2.Translator(
 tokenizer = spm.SentencePieceProcessor(model_file=os.path.join(MODEL_DIR, "sentencepiece.bpe.model"))
 
 SENTENCE_END = re.compile(r"(?<=[.!?:;])\s+")
+LETTER = re.compile(r"[^\W\d_]", re.UNICODE)
+# List markers and other decoration kept outside the text sent to the model.
+DECORATION = re.compile(r"^([\s■•▪●○◦\-–—*·>]+)?(.*?)([\s:;.,]*)$", re.DOTALL)
+
+# Small models sometimes "hallucinate" a whole unrelated sentence for a short
+# or odd input; such outputs are dropped and the original is kept.
+MAX_LENGTH_RATIO = 3.0
+MAX_LENGTH_SLACK = 40
 
 
 def split_sentences(line):
     return [s for s in SENTENCE_END.split(line.strip()) if s]
 
 
+def looks_hallucinated(source, translated):
+    if not translated.strip():
+        return True
+    if len(translated) > len(source) * MAX_LENGTH_RATIO + MAX_LENGTH_SLACK:
+        return True
+    # The same short piece repeated many times ("«»«»«»", "1. 1. 1.").
+    return bool(re.search(r"(.{1,6})\1{4,}", translated))
+
+
 def translate_sentences(sentences, source, target):
     tokens = LANG_TOKENS[FAMILY]
     src_token, tgt_token = tokens[source], tokens[target]
-    out = []
-    for start in range(0, len(sentences), BATCH_SIZE):
-        batch = sentences[start : start + BATCH_SIZE]
-        sources = [
-            [src_token] + tokenizer.encode(s, out_type=str)[:MAX_TOKENS] + ["</s>"] for s in batch
-        ]
+    out = [None] * len(sentences)
+
+    # Only parts with letters go to the model; numbers / symbols stay as they are.
+    todo = []
+    for i, sentence in enumerate(sentences):
+        prefix, core, suffix = DECORATION.match(sentence).groups()
+        if len(LETTER.findall(core)) < 2:
+            out[i] = sentence
+        else:
+            todo.append((i, prefix or "", core, suffix or ""))
+
+    for start in range(0, len(todo), BATCH_SIZE):
+        batch = todo[start : start + BATCH_SIZE]
+        encoded = [tokenizer.encode(core, out_type=str)[:MAX_TOKENS] for _, _, core, _ in batch]
         results = translator.translate_batch(
-            sources,
+            [[src_token] + tokens_ + ["</s>"] for tokens_ in encoded],
             target_prefix=[[tgt_token]] * len(batch),
-            beam_size=2,
-            max_decoding_length=MAX_TOKENS + 64,
-            repetition_penalty=1.1,
+            beam_size=3,
+            # Output is limited relative to the longest input in the batch.
+            max_decoding_length=min(MAX_TOKENS + 64, max(len(t) for t in encoded) * 3 + 10),
+            repetition_penalty=1.2,
+            no_repeat_ngram_size=4,
         )
-        for result in results:
+        for (i, prefix, core, suffix), result in zip(batch, results):
             # The first token is the target language code.
-            out.append(tokenizer.decode(result.hypotheses[0][1:]))
+            translated = tokenizer.decode(result.hypotheses[0][1:]).strip()
+            if looks_hallucinated(core, translated):
+                out[i] = sentences[i]
+            else:
+                # The model adds its own final punctuation sometimes; keep the original one.
+                out[i] = prefix + (translated.rstrip(" .:;,։") if suffix.strip() else translated) + suffix
     return out
 
 
