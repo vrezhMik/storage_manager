@@ -114,7 +114,7 @@ class KnowledgeBase
         });
 
         arsort($best);
-        $chunks = KbChunk::with('source:id,title,type,url')->whereIn('id', array_keys($best))->get()->keyBy('id');
+        $chunks = KbChunk::with('source:id,title,type,url,file_path')->whereIn('id', array_keys($best))->get()->keyBy('id');
 
         // One result per section (source + heading), in score order.
         $hits = [];
@@ -197,7 +197,7 @@ class KnowledgeBase
                 throw new RuntimeException('Cannot download the page ('.$response->status().')');
             }
 
-            $document = $this->extractor->fromHtml($response->body());
+            $document = $this->extractor->fromHtml($response->body(), $source->url);
             $this->extractor->guardFramedPage($document, $response->body());
 
             return $document;

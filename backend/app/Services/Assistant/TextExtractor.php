@@ -52,11 +52,36 @@ class TextExtractor
         return '[[img:'.str_replace([']', "\n"], '', $src).']]';
     }
 
+    // Page address for pages fetched by link: relative <img src> become full URLs.
+    private ?string $baseUrl = null;
+
+    private function absoluteUrl(string $src): string
+    {
+        $src = trim($src);
+        if ($this->baseUrl === null || $src === '' || preg_match('#^(https?:|data:)#i', $src)) {
+            return $src;
+        }
+        $base = parse_url($this->baseUrl);
+        if (! isset($base['scheme'], $base['host'])) {
+            return $src;
+        }
+        $origin = $base['scheme'].'://'.$base['host'].(isset($base['port']) ? ':'.$base['port'] : '');
+        if (str_starts_with($src, '//')) {
+            return $base['scheme'].':'.$src;
+        }
+        if (str_starts_with($src, '/')) {
+            return $origin.$src;
+        }
+        $dir = preg_replace('#/[^/]*$#', '/', $base['path'] ?? '/');
+
+        return $origin.$dir.preg_replace('#^\./#', '', $src);
+    }
+
     private function addImages(DOMElement $element, array &$current): void
     {
         $images = strtolower($element->tagName) === 'img' ? [$element] : iterator_to_array($element->getElementsByTagName('img'));
         foreach ($images as $img) {
-            $marker = self::imageMarker((string) $img->getAttribute('src'));
+            $marker = self::imageMarker($this->absoluteUrl((string) $img->getAttribute('src')));
             if ($marker !== null) {
                 $current['lines'][] = $marker;
             }
@@ -66,8 +91,9 @@ class TextExtractor
     /**
      * @return array{title: string|null, sections: array<int, array{heading: string|null, text: string}>}
      */
-    public function fromHtml(string $html): array
+    public function fromHtml(string $html, ?string $baseUrl = null): array
     {
+        $this->baseUrl = $baseUrl;
         $html = $this->toUtf8($html);
         // The text is UTF-8 now; an old <meta charset=windows-1251> would make
         // libxml decode it a second time.

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\KbSource;
 use App\Services\Assistant\KnowledgeBase;
+use App\Services\Assistant\TextExtractor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +14,37 @@ use Throwable;
 
 class AssistantController extends Controller
 {
+    /** @var array<string, bool> picture path => exists, for this request */
+    private array $imageExists = [];
+
+    /**
+     * Drops [[img:...]] markers whose file was not uploaded (e.g. only the
+     * page was uploaded, without its "_files" folder), so the terminal only
+     * announces pictures it can show. Links to the web are kept.
+     */
+    private function keepExistingImages(?string $text, KbSource $source): ?string
+    {
+        if ($text === null || ! str_contains($text, '[[img:')) {
+            return $text;
+        }
+
+        $folder = trim(dirname((string) $source->file_path), '/');
+
+        $kept = preg_replace_callback(TextExtractor::IMAGE_MARKER, function (array $m) use ($source, $folder) {
+            if (preg_match('#^https?://#i', $m[1])) {
+                return $m[0];
+            }
+            if ($source->type !== KbSource::TYPE_FILE) {
+                return '';
+            }
+            $path = $folder.'/'.$m[1];
+
+            return ($this->imageExists[$path] ??= Storage::disk('kb')->exists($path)) ? $m[0] : '';
+        }, $text);
+
+        return trim(preg_replace("/\n{2,}/", "\n", $kept));
+    }
+
     /**
      * A picture referenced from a source's text ([[img:path]]), relative to
      * the folder of the source file. ?path=image246.png
@@ -71,6 +103,8 @@ class AssistantController extends Controller
 
         $minScore = (float) config('services.assistant.min_score', 0.5);
 
+        $images = fn (?string $text, KbSource $source) => $this->keepExistingImages($text, $source);
+
         return response()->json([
             'question' => $question,
             'min_score' => $minScore,
@@ -78,10 +112,10 @@ class AssistantController extends Controller
                 'score' => round($hit['score'], 4),
                 'relevant' => $hit['score'] >= $minScore,
                 'heading' => $hit['chunk']->heading,
-                'content' => $hit['chunk']->content,
-                'content_hy' => $hit['chunk']->content_hy,
-                'section' => $hit['section'],
-                'section_hy' => $hit['section_hy'],
+                'content' => $images($hit['chunk']->content, $hit['chunk']->source),
+                'content_hy' => $images($hit['chunk']->content_hy, $hit['chunk']->source),
+                'section' => $images($hit['section'], $hit['chunk']->source),
+                'section_hy' => $images($hit['section_hy'], $hit['chunk']->source),
                 'source' => [
                     'id' => $hit['chunk']->source->id,
                     'title' => $hit['chunk']->source->title,
