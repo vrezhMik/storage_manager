@@ -6,12 +6,13 @@ import { API_BASE, authFetch } from "../lib/auth";
 
 export type AssistantResult = {
   score: number;
+  relevant?: boolean;
   heading: string | null;
   content: string;
   source: { id: number; title: string; type: "url" | "file"; url: string | null };
 };
 
-export type AssistantResponse = { question: string; results: AssistantResult[] };
+export type AssistantResponse = { question: string; min_score?: number; results: AssistantResult[] };
 
 const EXAMPLES = [
   "Ինչպե՞ս նայել վաճառքի հաշվետվությունը ըստ գործընկերների",
@@ -65,6 +66,54 @@ function ResultCard({ result, rank }: { result: AssistantResult; rank: number })
         )}
       </div>
     </article>
+  );
+}
+
+// Weak matches (below the server's min_score) are hidden unless asked for.
+function Results({ response }: { response: AssistantResponse }) {
+  const [showWeak, setShowWeak] = useState(false);
+  useEffect(() => setShowWeak(false), [response]);
+
+  const relevant = response.results.filter((r) => r.relevant !== false);
+  const weak = response.results.filter((r) => r.relevant === false);
+  const shown = showWeak ? response.results : relevant;
+
+  return (
+    <div className="space-y-3">
+      {relevant.length === 0 ? (
+        <div className={`${cardClass} space-y-2`}>
+          <p className="text-sm text-foreground">Ձեր հարցի պատասխանը բազայում չգտնվեց։</p>
+          <p className="text-sm text-muted-foreground">
+            Փորձեք ձևակերպել այլ կերպ, կամ ադմինկայում ավելացրեք համապատասխան ուղեցույց։
+          </p>
+          {weak.length > 0 && !showWeak && (
+            <button
+              type="button"
+              onClick={() => setShowWeak(true)}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Ցույց տալ մոտավոր արդյունքները ({weak.length})
+            </button>
+          )}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Ամենահամապատասխան հատվածները «{response.question}» հարցի համար.
+        </p>
+      )}
+      {shown.map((result, idx) => (
+        <ResultCard key={`${result.source.id}-${idx}`} result={result} rank={idx + 1} />
+      ))}
+      {relevant.length > 0 && weak.length > 0 && !showWeak && (
+        <button
+          type="button"
+          onClick={() => setShowWeak(true)}
+          className="text-xs font-medium text-primary hover:underline"
+        >
+          Ցույց տալ նաև թույլ համապատասխանությունները ({weak.length})
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -160,22 +209,7 @@ export function AssistantView({ onAsk, response, loading, error, history }: View
               <div className="h-4 w-2/3 rounded bg-muted animate-pulse" />
             </div>
           ) : response ? (
-            response.results.length === 0 ? (
-              <div className={cardClass}>
-                <p className="text-sm text-muted-foreground">
-                  Պատասխան չգտնվեց։ Փորձեք ձևակերպել այլ կերպ, կամ ադմինկայում ավելացրեք համապատասխան ուղեցույց։
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Ամենահամապատասխան հատվածները «{response.question}» հարցի համար.
-                </p>
-                {response.results.map((result, idx) => (
-                  <ResultCard key={`${result.source.id}-${idx}`} result={result} rank={idx + 1} />
-                ))}
-              </div>
-            )
+            <Results response={response} />
           ) : null}
         </div>
       </main>

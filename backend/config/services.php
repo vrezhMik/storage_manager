@@ -37,6 +37,12 @@ return [
         'timeout' => (int) env('OLLAMA_TIMEOUT', 120),
     ],
 
+    'assistant' => [
+        // Chunks scoring below this (cosine similarity, 0..1) are not shown as
+        // answers; bge-m3 gives roughly 0.55+ for related text.
+        'min_score' => (float) env('ASSISTANT_MIN_SCORE', 0.5),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

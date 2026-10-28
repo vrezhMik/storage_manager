@@ -87,6 +87,8 @@ class KbSourceResource extends Resource
                     ->sortable(),
             ])
             ->defaultSort('id', 'desc')
+            // Refresh while background indexing is still running.
+            ->poll(fn () => KbSource::query()->where('status', KbSource::STATUS_PENDING)->exists() ? '5s' : null)
             ->actions([
                 Actions\Action::make('index')
                     ->label('Index')

@@ -36,10 +36,14 @@ class AssistantController extends Controller
             ], Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
+        $minScore = (float) config('services.assistant.min_score', 0.5);
+
         return response()->json([
             'question' => $question,
+            'min_score' => $minScore,
             'results' => array_map(fn (array $hit) => [
                 'score' => round($hit['score'], 4),
+                'relevant' => $hit['score'] >= $minScore,
                 'heading' => $hit['chunk']->heading,
                 'content' => $hit['chunk']->content,
                 'source' => [
