@@ -23,7 +23,7 @@ function Write-Log([string]$text) {
 
 try {
     # cmd keeps the bytes as they are (PowerShell 5 redirection would re-encode them).
-    cmd /c "ssh -i `"$Key`" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 $Server > `"$tmp`""
+    cmd /c "ssh -T -i `"$Key`" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 $Server > `"$tmp`""
     if ($LASTEXITCODE -ne 0) { throw "ssh exit code $LASTEXITCODE" }
 
     $bytes = [System.IO.File]::ReadAllBytes($tmp)
