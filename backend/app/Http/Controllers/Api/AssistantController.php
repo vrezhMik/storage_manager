@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\KbSource;
+use App\Services\Assistant\DataIntentParser;
 use App\Services\Assistant\KnowledgeBase;
 use App\Services\Assistant\TextExtractor;
 use Illuminate\Http\JsonResponse;
@@ -75,6 +76,34 @@ class AssistantController extends Controller
             'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'",
             'X-Content-Type-Options' => 'nosniff',
         ]);
+    }
+
+    /**
+     * The report a data question asks for ({intent: {topic, start, end, ...}}),
+     * read by the local chat model. engine "none" = no model configured, the
+     * terminal then uses its built-in rules.
+     */
+    public function intent(Request $request, DataIntentParser $parser): JsonResponse
+    {
+        $question = trim((string) $request->input('question', ''));
+
+        if (mb_strlen($question) < 3 || mb_strlen($question) > 1000) {
+            return response()->json([
+                'message' => 'Question must be 3 to 1000 characters long',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        if (! $parser->enabled()) {
+            return response()->json(['engine' => 'none', 'intent' => null]);
+        }
+
+        try {
+            return response()->json(['engine' => 'llm', 'intent' => $parser->parse($question)]);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json(['engine' => 'error', 'intent' => null]);
+        }
     }
 
     public function search(Request $request, KnowledgeBase $knowledgeBase): JsonResponse

@@ -12,6 +12,7 @@ import WarehouseIcon from "../UI/WarehouseIcon";
 import TrendIcon from "../UI/TrendIcon";
 import SnowflakeIcon from "../UI/SnowflakeIcon";
 import TrophyIcon from "../UI/TrophyIcon";
+import UsersIcon from "../UI/UsersIcon";
 import DateRangeModal, { DateRange } from "./components/DateRangeModal";
 import { abcHref, debtsHref, salesByWarehouseHref, salesHref } from "./links";
 
@@ -32,6 +33,7 @@ const REPORTS: Report[] = [
   { title: "Վաճառքի դինամիկա", Icon: TrendIcon, href: "/reports/sales-monthly" },
   { title: "Սառեցված մնացորդ", Icon: SnowflakeIcon, href: "/reports/frozen-stock" },
   { title: "Թոփ ապրանքներ (ABC)", Icon: TrophyIcon, hrefFor: abcHref },
+  { title: "Հաճախորդներ", Icon: UsersIcon, href: "/reports/customers" },
 ];
 
 const buttonClass =

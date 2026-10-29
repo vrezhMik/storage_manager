@@ -180,23 +180,33 @@ class OrderController extends Controller
 
     /**
      * Optional ?group=manager|partner|item -> GroupBy=Manager|Partner|Item for 1C.
+     * ?group=partner-item&partner=NAME -> GroupBy=PartnerItem&Partner=NAME: the
+     * items one customer bought (customer card).
      */
     public function salesMonthly(Request $request): Response
     {
-        $groups = ['manager' => 'Manager', 'partner' => 'Partner', 'item' => 'Item'];
+        $groups = ['manager' => 'Manager', 'partner' => 'Partner', 'item' => 'Item', 'partner-item' => 'PartnerItem'];
         $group = (string) $request->query('group', '');
 
         if ($group !== '' && ! isset($groups[$group])) {
             return response()->json([
-                'message' => 'Invalid group, expected manager, partner or item',
+                'message' => 'Invalid group, expected manager, partner, item or partner-item',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        return $this->dateRangeReport(
-            $request,
-            'sales monthly',
-            $group === '' ? [] : ['GroupBy' => $groups[$group]],
-        );
+        $extra = $group === '' ? [] : ['GroupBy' => $groups[$group]];
+
+        if ($group === 'partner-item') {
+            $partner = trim((string) $request->query('partner', ''));
+            if ($partner === '' || mb_strlen($partner) > 300) {
+                return response()->json([
+                    'message' => 'partner is required for partner-item (up to 300 characters)',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $extra['Partner'] = $partner;
+        }
+
+        return $this->dateRangeReport($request, 'sales monthly', $extra);
     }
 
     /**

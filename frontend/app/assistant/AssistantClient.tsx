@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import AuthGuard from "../components/AuthGuard";
-import { API_BASE, authFetch } from "../lib/auth";
+import { API_BASE, authFetch, getUserSections } from "../lib/auth";
+import DataAnswerCard from "./DataAnswerCard";
+import { answerDataQuestion, DataAnswer } from "./dataAnswers";
+import { DataIntent, looksLikeHowTo, parseDataQuestion } from "./dataQuestions";
 
 export type AssistantResult = {
   score: number;
@@ -65,9 +68,15 @@ function RichText({ text, sourceId }: { text: string; sourceId: number }) {
 export type AssistantResponse = { question: string; min_score?: number; results: AssistantResult[] };
 
 const EXAMPLES = [
-  "Ինչպե՞ս նայել վաճառքի հաշվետվությունը ըստ գործընկերների",
   "Ինչպե՞ս ձևակերպել ապրանքի վերադարձը",
   "Որտե՞ղ տեսնել մնացորդները ըստ պահեստների",
+];
+
+// Questions about the numbers; shown only to users who can open reports.
+const DATA_EXAMPLES = [
+  "Ո՞վ է այս ամիս ամենաշատը վաճառել",
+  "Ո՞ր հաճախորդներն են 30 օր չեն գնել",
+  "Ժամկետանց պարտքերը ըստ հաճախորդների",
 ];
 
 const cardClass = "rounded-xl border bg-card text-card-foreground shadow p-5";
@@ -203,15 +212,17 @@ function Results({ response }: { response: AssistantResponse }) {
 }
 
 type ViewProps = {
-  onAsk: (question: string) => void;
+  onAsk: (question: string, knowledgeBaseOnly?: boolean) => void;
   response: AssistantResponse | null;
+  dataAnswer?: DataAnswer | null;
   loading: boolean;
   error: string | null;
   history: string[];
+  examples?: string[];
 };
 
 // Presentation only, so it can be rendered without the API.
-export function AssistantView({ onAsk, response, loading, error, history }: ViewProps) {
+export function AssistantView({ onAsk, response, dataAnswer, loading, error, history, examples = EXAMPLES }: ViewProps) {
   const [question, setQuestion] = useState("");
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -261,9 +272,9 @@ export function AssistantView({ onAsk, response, loading, error, history }: View
                 </button>
               </div>
             </form>
-            {!response && !loading && (
+            {!response && !dataAnswer && !loading && (
               <div className="flex flex-wrap gap-2">
-                {(history.length > 0 ? history : EXAMPLES).map((q) => (
+                {(history.length > 0 ? history : examples).map((q) => (
                   <button
                     key={q}
                     type="button"
@@ -287,6 +298,8 @@ export function AssistantView({ onAsk, response, loading, error, history }: View
               <div className="h-4 w-full rounded bg-muted animate-pulse" />
               <div className="h-4 w-2/3 rounded bg-muted animate-pulse" />
             </div>
+          ) : dataAnswer ? (
+            <DataAnswerCard answer={dataAnswer} onSearchKb={() => onAsk(question, true)} />
           ) : response ? (
             <Results response={response} />
           ) : null}
@@ -296,16 +309,40 @@ export function AssistantView({ onAsk, response, loading, error, history }: View
   );
 }
 
+// A data question goes to 1C: the built-in rules read it first (fast, no
+// server load); otherwise the server's chat model, when one is set up,
+// decides whether it is about the numbers. Everything else is searched in
+// the knowledge base.
+const readIntent = async (question: string, signal: AbortSignal): Promise<DataIntent | null> => {
+  const local = parseDataQuestion(question);
+  if (local) return local;
+  if (looksLikeHowTo(question)) return null;
+  try {
+    const res = await authFetch<{ engine?: string; intent?: DataIntent | null }>(`${API_BASE}/assistant/intent`, {
+      method: "POST",
+      body: JSON.stringify({ question }),
+      signal,
+    });
+    return res?.intent && res.intent.topic !== "none" ? res.intent : null;
+  } catch (err: any) {
+    if (err?.name === "AbortError") throw err;
+    // An older backend without /assistant/intent: just search the knowledge base.
+    return null;
+  }
+};
+
 export default function AssistantClient() {
   const [response, setResponse] = useState<AssistantResponse | null>(null);
+  const [dataAnswer, setDataAnswer] = useState<DataAnswer | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>([]);
   const requestRef = useRef<AbortController | null>(null);
+  const [canSeeData] = useState(() => getUserSections().reports);
 
   useEffect(() => () => requestRef.current?.abort(), []);
 
-  const ask = async (question: string) => {
+  const ask = async (question: string, knowledgeBaseOnly = false) => {
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
@@ -313,15 +350,28 @@ export default function AssistantClient() {
     setError(null);
     setHistory((prev) => [question, ...prev.filter((q) => q !== question)].slice(0, 5));
     try {
+      if (canSeeData && !knowledgeBaseOnly) {
+        const intent = await readIntent(question, controller.signal);
+        const answer = intent ? await answerDataQuestion(intent, question) : null;
+        if (controller.signal.aborted) return;
+        if (answer) {
+          setResponse(null);
+          setDataAnswer(answer);
+          return;
+        }
+      }
       const data = await authFetch<AssistantResponse>(`${API_BASE}/assistant/search`, {
         method: "POST",
         body: JSON.stringify({ question }),
         signal: controller.signal,
       });
-      if (!controller.signal.aborted) setResponse(data ?? { question, results: [] });
+      if (!controller.signal.aborted) {
+        setDataAnswer(null);
+        setResponse(data ?? { question, results: [] });
+      }
     } catch (err: any) {
       if (controller.signal.aborted || err?.name === "AbortError") return;
-      console.error("Assistant search failed", err);
+      console.error("Assistant failed", err);
       setError(
         String(err?.message ?? "").includes("503")
           ? "Օգնականը հիմա հասանելի չէ։ Փորձեք մի փոքր ուշ։"
@@ -334,7 +384,15 @@ export default function AssistantClient() {
 
   return (
     <AuthGuard section="assistant">
-      <AssistantView onAsk={ask} response={response} loading={loading} error={error} history={history} />
+      <AssistantView
+        onAsk={ask}
+        response={response}
+        dataAnswer={dataAnswer}
+        loading={loading}
+        error={error}
+        history={history}
+        examples={canSeeData ? [...DATA_EXAMPLES, ...EXAMPLES] : EXAMPLES}
+      />
     </AuthGuard>
   );
 }

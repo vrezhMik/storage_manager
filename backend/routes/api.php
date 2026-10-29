@@ -26,4 +26,5 @@ Route::middleware(['auth.jwt', 'section:reports'])->get('abc', [OrderController:
 Route::middleware(['auth.jwt', 'section:reports'])->get('overdue-debts', [OrderController::class, 'overdueDebts']);
 Route::middleware(['auth.jwt', 'section:reports'])->get('sales-monthly', [OrderController::class, 'salesMonthly']);
 Route::middleware(['auth.jwt', 'section:assistant'])->post('assistant/search', [AssistantController::class, 'search']);
+Route::middleware(['auth.jwt', 'section:assistant'])->post('assistant/intent', [AssistantController::class, 'intent']);
 Route::middleware(['auth.jwt', 'section:assistant'])->get('assistant/image/{source}', [AssistantController::class, 'image']);

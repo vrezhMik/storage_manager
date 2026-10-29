@@ -35,6 +35,12 @@ return [
         // Limit CPU use so the website stays responsive while embedding.
         'num_thread' => (int) env('OLLAMA_NUM_THREAD', 2),
         'timeout' => (int) env('OLLAMA_TIMEOUT', 120),
+        // Chat model that turns assistant questions into report requests.
+        // Empty = off: the terminal then uses its built-in rules.
+        'chat_model' => env('OLLAMA_CHAT_MODEL', ''),
+        'chat_timeout' => (int) env('OLLAMA_CHAT_TIMEOUT', 60),
+        'chat_num_thread' => (int) env('OLLAMA_CHAT_NUM_THREAD', 2),
+        'chat_keep_alive' => env('OLLAMA_CHAT_KEEP_ALIVE', '30m'),
     ],
 
     // Local translator for the assistant (tools/translator). Empty URL = off.
