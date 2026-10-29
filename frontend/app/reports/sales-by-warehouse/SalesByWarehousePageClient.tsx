@@ -13,7 +13,7 @@ export default function SalesByWarehousePageClient() {
       extractRows={extractSaleRows}
       hrefFor={salesByWarehouseHref}
       renderRows={(rows) => (
-        <GroupedSalesTable rows={rows} groupOf={rowWarehouse} groupHeader="Պահեստ / Գործընկեր" />
+        <GroupedSalesTable rows={rows} groupOf={rowWarehouse} groupHeader="Պահեստ / Գործընկեր" title="Վաճառք ըստ պահեստների" />
       )}
     />
   );

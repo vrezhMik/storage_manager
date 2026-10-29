@@ -13,7 +13,7 @@ export default function SalesPageClient() {
       extractRows={extractSaleRows}
       hrefFor={salesHref}
       renderRows={(rows) => (
-        <GroupedSalesTable rows={rows} groupOf={rowManager} groupHeader="Մենեջեր / Գործընկեր" />
+        <GroupedSalesTable rows={rows} groupOf={rowManager} groupHeader="Մենեջեր / Գործընկեր" title="Վաճառք ըստ մենեջերների" />
       )}
     />
   );

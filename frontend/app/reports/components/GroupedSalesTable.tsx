@@ -2,6 +2,9 @@
 
 import { Fragment, useState } from "react";
 import { formatDisplayDate } from "./DateRangeModal";
+import ExcelButton from "../../components/ExcelButton";
+import MobileRows from "./MobileRows";
+import { downloadXlsx } from "../../lib/excel";
 import {
   SaleRow,
   formatAmount,
@@ -100,10 +103,12 @@ type Props = {
   groupOf: (row: SaleRow) => string;
   // First column header, e.g. "Պահեստ / Գործընկեր".
   groupHeader: string;
+  // Report name, used for the Excel file.
+  title?: string;
 };
 
 // Sales pivot: group rows with + / − to show their partners, dates as columns.
-export default function GroupedSalesTable({ rows, groupOf, groupHeader }: Props) {
+export default function GroupedSalesTable({ rows, groupOf, groupHeader, title = "Վաճառք" }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   if (rows.length === 0) {
@@ -121,19 +126,62 @@ export default function GroupedSalesTable({ rows, groupOf, groupHeader }: Props)
       return next;
     });
 
+  // Phone cards: amounts per date, only dates with sales.
+  const perDate = (a: Amounts) =>
+    dates
+      .filter((d) => a.byDate.has(d))
+      .map((d) => ({ label: formatDisplayDate(d), value: formatAmount(a.byDate.get(d) ?? 0) }));
+
+  // Excel gets every group with its partners already "opened".
+  const exportExcel = () => {
+    const amounts = (a: Amounts) => [...dates.map((d) => a.byDate.get(d) ?? null), a.total];
+    const period = dates.length ? `${formatDisplayDate(dates[0])} – ${formatDisplayDate(dates[dates.length - 1])}` : "";
+    return downloadXlsx(`${title} ${period}`, [
+      {
+        name: title,
+        title: [title, period],
+        columns: [
+          { header: groupHeader, width: 42 },
+          ...dates.map((d) => ({ header: formatDisplayDate(d), width: 14, numeric: true })),
+          { header: "Ընդամենը", width: 16, numeric: true },
+        ],
+        rows: groups.flatMap((g) => [
+          { cells: [g.name, ...amounts(g)], level: 0 as const },
+          ...g.partners.map((p) => ({ cells: [p.name, ...amounts(p)], level: 1 as const })),
+        ]),
+        total: ["Ընդամենը", ...amounts(totals)],
+      },
+    ]);
+  };
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground">Վաճառք</span>
-        <button
-          type="button"
-          onClick={() => setExpanded(allExpanded ? new Set() : new Set(groups.map((g) => g.name)))}
-          className="text-xs font-medium text-primary hover:underline"
-        >
-          {allExpanded ? "Փակել բոլորը" : "Բացել բոլորը"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setExpanded(allExpanded ? new Set() : new Set(groups.map((g) => g.name)))}
+            className="hidden md:inline text-xs font-medium text-primary hover:underline"
+          >
+            {allExpanded ? "Փակել բոլորը" : "Բացել բոլորը"}
+          </button>
+          <ExcelButton onExport={exportExcel} />
+        </div>
       </div>
-      <div className="overflow-x-auto -mx-6 px-6">
+      <div className="md:hidden">
+        <MobileRows
+          rows={groups.map((g) => ({
+            key: g.name,
+            title: g.name,
+            value: formatAmount(g.total),
+            details: perDate(g),
+            children: g.partners.map((p) => ({ key: `${g.name}::${p.name}`, title: p.name, value: formatAmount(p.total), details: perDate(p) })),
+          }))}
+          total={{ key: "total", title: "Ընդամենը", value: formatAmount(totals.total), details: perDate(totals) }}
+        />
+      </div>
+      <div className="hidden md:block overflow-x-auto -mx-6 px-6">
         <table className="min-w-full border-collapse">
           <thead>
             <tr>

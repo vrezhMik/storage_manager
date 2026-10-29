@@ -4,6 +4,9 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatDisplayDate } from "../components/DateRangeModal";
+import ExcelButton from "../../components/ExcelButton";
+import MobileRows from "../components/MobileRows";
+import { downloadXlsx } from "../../lib/excel";
 import { formatAmount, stickyClass, tdClass, thClass, toNumber } from "../sales/salesData";
 
 // 1C returns { Date, Debts: [{ Менеджер, Партнер, ОбъектРасчетов, Валюта, Долг,
@@ -56,6 +59,13 @@ const percent = (part: number, whole: number) =>
 
 const cardClass = "rounded-xl border bg-card text-card-foreground shadow p-5";
 
+// Phone cards: days late, total debt and overdue share under the name.
+const overdueMetrics = (b: Balance) => [
+  ...(b.overdue > 0 ? [{ label: "Ուշացում", value: `${b.maxDays} օր`, strong: true }] : []),
+  { label: "Ընդհանուր", value: formatAmount(b.total) },
+  { label: "Ուշացածի %", value: percent(b.overdue, b.total) },
+];
+
 function BalanceCells({ balance, bold }: { balance: Balance; bold?: boolean }) {
   return (
     <>
@@ -105,12 +115,24 @@ function CurrencyTable({
         <button
           type="button"
           onClick={() => setExpanded(allExpanded ? new Set() : new Set(managers.map((m) => m.name)))}
-          className="text-xs font-medium text-primary hover:underline"
+          className="hidden md:inline text-xs font-medium text-primary hover:underline"
         >
           {allExpanded ? "Փակել բոլորը" : "Բացել բոլորը"}
         </button>
       </div>
-      <div className="overflow-x-auto -mx-5 px-5">
+      <div className="md:hidden">
+        <MobileRows
+          rows={managers.map((m) => ({
+            key: m.name,
+            title: m.name,
+            value: formatAmount(m.overdue),
+            metrics: overdueMetrics(m),
+            children: m.partners.map((p) => ({ key: `${m.name}::${p.name}`, title: p.name, value: formatAmount(p.overdue), metrics: overdueMetrics(p) })),
+          }))}
+          total={{ key: "total", title: "Ընդամենը", value: formatAmount(totals.overdue), metrics: overdueMetrics(totals) }}
+        />
+      </div>
+      <div className="hidden md:block overflow-x-auto -mx-5 px-5">
         <table className="min-w-full border-collapse">
           <thead>
             <tr>
@@ -184,6 +206,28 @@ type ViewProps = {
 };
 
 // Presentation only, so it can be rendered without the API.
+// One sheet per currency, managers with their partners underneath.
+const exportOverdue = (tables: { currency: string | null; managers: Manager[]; totals: Balance }[], date: string) => {
+  const share = (b: Balance) => (b.total > 0 ? Math.round((b.overdue / b.total) * 1000) / 10 : null);
+  const cells = (b: Balance) => [b.overdue, b.overdue > 0 ? b.maxDays : null, b.total, share(b)];
+  return downloadXlsx(`Ժամկետանց պարտքեր ${formatDisplayDate(date)}`, tables.map((t) => ({
+    name: t.currency ?? "Ժամկետանց",
+    title: [`Ժամկետանց պարտքեր${t.currency ? `, ${t.currency}` : ""}`, `${formatDisplayDate(date)} դրությամբ`],
+    columns: [
+      { header: "Մենեջեր / Գործընկեր", width: 42 },
+      { header: "Ուշացած գումար", numeric: true },
+      { header: "Ուշացում, օր", numeric: true, width: 12 },
+      { header: "Ընդհանուր պարտք", numeric: true },
+      { header: "Ուշացածի %", numeric: true, width: 12 },
+    ],
+    rows: t.managers.flatMap((m) => [
+      { cells: [m.name, ...cells(m)], level: 0 as const },
+      ...m.partners.map((p) => ({ cells: [p.name, ...cells(p)], level: 1 as const })),
+    ]),
+    total: ["Ընդամենը", ...cells(t.totals)],
+  })));
+};
+
 export function OverdueDebtsView({ date, onDateChange, data, loading, error }: ViewProps) {
   const [showAll, setShowAll] = useState(false);
 
@@ -241,6 +285,7 @@ export function OverdueDebtsView({ date, onDateChange, data, loading, error }: V
               <p className="text-sm text-muted-foreground">{formatDisplayDate(date)} դրությամբ</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
+              {tables.length > 0 && <ExcelButton onExport={() => exportOverdue(tables, date)} />}
               <label className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"

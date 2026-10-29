@@ -4,6 +4,9 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatAmount, toNumber } from "../sales/salesData";
+import ExcelButton from "../../components/ExcelButton";
+import MobileRows from "../components/MobileRows";
+import { downloadXlsx } from "../../lib/excel";
 
 // 1C returns { Sales: [{ Месяц: "yyyy-MM", Склад, Менеджер, Партнер, Номенклатура, Сумма }] }
 // for the requested Datestart..Date. Which of Склад / Менеджер / Партнер / Номенклатура
@@ -283,7 +286,22 @@ function GroupTable({
       {groups.length === 0 ? (
         <p className="text-sm text-muted-foreground">Տվյալներ չկան</p>
       ) : (
-        <div className="overflow-x-auto -mx-5 px-5">
+        <>
+        <div className="md:hidden">
+          <MobileRows
+            rows={visible.map((g) => ({
+              key: g.name,
+              title: g.name,
+              value: formatAmount(g.value1),
+              metrics: [
+                { label: "Վաճառք 2", value: formatAmount(g.value2) },
+                { label: "Փոփոխություն", value: <Change current={g.value1} base={g.value2} /> },
+              ],
+              children: mode === "manager" ? g.subs.map((s) => ({ key: `${g.name}::${s.name}`, title: s.name, value: formatAmount(s.value1), metrics: [{ label: "Վաճառք 2", value: formatAmount(s.value2) }, { label: "Փոփոխություն", value: <Change current={s.value1} base={s.value2} /> }] })) : undefined,
+            }))}
+          />
+        </div>
+        <div className="hidden md:block overflow-x-auto -mx-5 px-5">
           <table className="min-w-full border-collapse">
             <thead>
               <tr>
@@ -306,6 +324,7 @@ function GroupTable({
             </tbody>
           </table>
         </div>
+        </>
       )}
       {mode === "item" && groups.length > ITEM_LIMIT && (
         <button
@@ -319,6 +338,84 @@ function GroupTable({
     </div>
   );
 }
+
+type MonthPair = { month1: string | null; month2: string | null; value1: number | null; value2: number | null };
+
+const changePercent = (current: number | null, base: number | null) =>
+  current === null || base === null || base === 0 ? null : Math.round(((current - base) / base) * 1000) / 10;
+
+// Sheet 1: month by month for what the chart shows; sheet 2: the group table.
+const exportMonthly = ({
+  pairs,
+  total1,
+  total2,
+  groups,
+  mode,
+  ranges,
+  selection,
+  warehouse,
+}: {
+  pairs: MonthPair[];
+  total1: number;
+  total2: number;
+  groups: GroupTotals[];
+  mode: Mode;
+  ranges: [MonthRange, MonthRange];
+  selection: Selection;
+  warehouse: string;
+}) => {
+  const period = (r: MonthRange) => `${monthLabel(r.from)} – ${monthLabel(r.to)}`;
+  const subtitle = [
+    `Ժամանակահատված 1: ${period(ranges[0])}`,
+    `Ժամանակահատված 2: ${period(ranges[1])}`,
+    ...(warehouse ? [`Պահեստ: ${warehouse}`] : []),
+    ...(selection ? [selection.sub ? `${selection.group} / ${selection.sub}` : selection.group] : []),
+  ].join(" · ");
+  const valueColumns = [
+    { header: "Վաճառք 1", numeric: true },
+    { header: "Վաճառք 2", numeric: true },
+    { header: "Տարբերություն", numeric: true },
+    { header: "Փոփոխություն, %", numeric: true, width: 16 },
+  ];
+  const values = (v1: number | null, v2: number | null) => [
+    v1,
+    v2,
+    v1 === null || v2 === null ? null : v1 - v2,
+    changePercent(v1, v2),
+  ];
+  const groupLabel = MODES.find((m) => m.mode === mode);
+
+  return downloadXlsx(`Վաճառքի դինամիկա ${period(ranges[0])}`, [
+    {
+      name: "Ըստ ամիսների",
+      title: ["Վաճառքի դինամիկա", subtitle],
+      columns: [
+        { header: "Ամիս 1", width: 14 },
+        valueColumns[0],
+        { header: "Ամիս 2", width: 14 },
+        ...valueColumns.slice(1),
+      ],
+      rows: pairs.map((p) => {
+        const [v1, v2, diff, change] = values(p.value1, p.value2);
+        return { cells: [p.month1 ? monthLabel(p.month1) : null, v1, p.month2 ? monthLabel(p.month2) : null, v2, diff, change] };
+      }),
+      total: ["Ընդամենը", total1, null, total2, total1 - total2, changePercent(total1, total2)],
+    },
+    ...(mode !== "total" && groupLabel
+      ? [
+          {
+            name: groupLabel.label,
+            title: [`Վաճառքի դինամիկա · ${groupLabel.label}`, subtitle],
+            columns: [{ header: groupLabel.groupLabel, width: 44 }, ...valueColumns],
+            rows: groups.flatMap((g) => [
+              { cells: [g.name, ...values(g.value1, g.value2)], level: (mode === "manager" ? 0 : undefined) as 0 | undefined },
+              ...g.subs.map((s) => ({ cells: [s.name, ...values(s.value1, s.value2)], level: 1 as const })),
+            ]),
+          },
+        ]
+      : []),
+  ]);
+};
 
 type ViewProps = {
   mode: Mode;
@@ -484,15 +581,20 @@ export function SalesMonthlyView({ mode, onModeChange, ranges, onRangesChange, d
                       </span>
                     )}
                   </h3>
-                  {selection && (
-                    <button
-                      type="button"
-                      onClick={() => setSelection(null)}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Ցույց տալ ընդհանուրը
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {selection && (
+                      <button
+                        type="button"
+                        onClick={() => setSelection(null)}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Ցույց տալ ընդհանուրը
+                      </button>
+                    )}
+                    <ExcelButton
+                      onExport={() => exportMonthly({ pairs, total1, total2, groups, mode, ranges, selection, warehouse })}
+                    />
+                  </div>
                 </div>
                 {max === 0 ? (
                   <p className="text-sm text-muted-foreground">Տվյալներ չկան</p>
@@ -521,7 +623,21 @@ export function SalesMonthlyView({ mode, onModeChange, ranges, onRangesChange, d
                 )}
               </div>
 
-              <div className={`${cardClass} overflow-x-auto`}>
+              <div className={`${cardClass} md:hidden`}>
+                <MobileRows
+                  rows={pairs.map((p, i) => ({
+                    key: String(i),
+                    title: p.month1 ? monthLabel(p.month1) : "—",
+                    value: p.value1 === null ? "—" : formatAmount(p.value1),
+                    metrics: [
+                      { label: p.month2 ? monthLabel(p.month2) : "Վաճառք 2", value: p.value2 === null ? "—" : formatAmount(p.value2) },
+                      ...(p.value1 !== null && p.value2 !== null ? [{ label: "Փոփոխություն", value: <Change current={p.value1} base={p.value2} /> }] : []),
+                    ],
+                  }))}
+                  total={{ key: "total", title: "Ընդամենը", value: formatAmount(total1), metrics: [{ label: "Վաճառք 2", value: formatAmount(total2) }, { label: "Փոփոխություն", value: <Change current={total1} base={total2} /> }] }}
+                />
+              </div>
+              <div className={`${cardClass} hidden md:block overflow-x-auto`}>
                 <table className="min-w-full border-collapse">
                   <thead>
                     <tr>

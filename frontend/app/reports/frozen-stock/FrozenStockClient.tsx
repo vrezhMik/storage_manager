@@ -4,6 +4,9 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatDisplayDate } from "../components/DateRangeModal";
+import ExcelButton from "../../components/ExcelButton";
+import MobileRows from "../components/MobileRows";
+import { downloadXlsx } from "../../lib/excel";
 import { formatAmount, stickyClass, tdClass, thClass, toNumber } from "../sales/salesData";
 
 // 1C returns { Date, Days, Stock: [{ Номенклатура, Склад, Остаток, Себестоимость,
@@ -43,6 +46,35 @@ type Item = {
 };
 
 type Group = { name: string; cost: number; items: Item[] };
+
+const exportFrozen = (groups: Group[], totalCost: number, date: string, days: number) =>
+  downloadXlsx(`Սառեցված մնացորդ ${formatDisplayDate(date)} ${days}+ օր`, [
+    {
+      name: "Սառեցված մնացորդ",
+      title: ["Սառեցված մնացորդ", `${formatDisplayDate(date)} դրությամբ, ${days} օր և ավելի չվաճառված`],
+      columns: [
+        { header: "Պահեստ / Ապրանք", width: 46 },
+        { header: "Մնացորդ", numeric: true, width: 12 },
+        { header: "Ինքնարժեք", numeric: true },
+        { header: "Վերջին վաճառք", width: 14 },
+        { header: "Օր առանց վաճառքի", numeric: true, width: 14 },
+      ],
+      rows: groups.flatMap((g) => [
+        { cells: [`${g.name} (${g.items.length})`, null, g.cost, null, null], level: 0 as const },
+        ...g.items.map((i) => ({
+          cells: [
+            i.name,
+            i.qty,
+            i.cost,
+            i.lastSale ? formatDisplayDate(i.lastSale) : "Չի վաճառվել",
+            i.idleDays ?? `${SEARCH_WINDOW_DAYS}+`,
+          ],
+          level: 1 as const,
+        })),
+      ]),
+      total: ["Ընդամենը", null, totalCost, null, null],
+    },
+  ]);
 
 const idleClass = (days: number | null) => {
   if (days === null || days >= 180) return "bg-red-100 text-red-800";
@@ -175,15 +207,38 @@ export function FrozenStockView({ date, days, onDateChange, onDaysChange, data, 
                   <>
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm text-muted-foreground">Ըստ պահեստների</span>
-                      <button
-                        type="button"
-                        onClick={() => setExpanded(allExpanded ? new Set() : new Set(groups.map((g) => g.name)))}
-                        className="text-xs font-medium text-primary hover:underline"
-                      >
-                        {allExpanded ? "Փակել բոլորը" : "Բացել բոլորը"}
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setExpanded(allExpanded ? new Set() : new Set(groups.map((g) => g.name)))}
+                          className="hidden md:inline text-xs font-medium text-primary hover:underline"
+                        >
+                          {allExpanded ? "Փակել բոլորը" : "Բացել բոլորը"}
+                        </button>
+                        <ExcelButton onExport={() => exportFrozen(groups, totalCost, date, days)} />
+                      </div>
                     </div>
-                    <div className="overflow-x-auto -mx-5 px-5">
+                    <div className="md:hidden">
+                      <MobileRows
+                        rows={groups.map((g) => ({
+                          key: g.name,
+                          title: `${g.name} (${g.items.length})`,
+                          value: formatAmount(g.cost),
+                          children: g.items.map((i, idx) => ({
+                            key: `${g.name}::${i.name}::${idx}`,
+                            title: i.name,
+                            value: formatAmount(i.cost),
+                            metrics: [
+                              { label: "Մնացորդ", value: formatAmount(i.qty) },
+                              { label: "Օր առանց վաճառքի", value: idleLabel(i.idleDays), strong: true },
+                              { label: "Վերջին վաճառք", value: i.lastSale ? formatDisplayDate(i.lastSale) : "Չի վաճառվել" },
+                            ],
+                          })),
+                        }))}
+                        total={{ key: "total", title: "Ընդամենը", value: formatAmount(totalCost) }}
+                      />
+                    </div>
+                    <div className="hidden md:block overflow-x-auto -mx-5 px-5">
                       <table className="min-w-full border-collapse">
                         <thead>
                           <tr>

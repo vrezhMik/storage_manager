@@ -2,6 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { formatAmount, tdClass, thClass, toNumber } from "../sales/salesData";
+import { DateRange, formatDisplayDate } from "../components/DateRangeModal";
+import ExcelButton from "../../components/ExcelButton";
+import MobileRows from "../components/MobileRows";
+import { downloadXlsx } from "../../lib/excel";
 
 // 1C returns { Datestart, Date, Items: [{ Номенклатура, Количество, СуммаВыручки, Себестоимость }] }.
 export type AbcRow = {
@@ -91,7 +95,47 @@ const buildItems = (rows: AbcRow[]) => {
   return { items, total };
 };
 
-export default function AbcTable({ rows }: { rows: AbcRow[] }) {
+// All items (not only the filtered class), in revenue order.
+const exportAbc = (items: Item[], total: number, range?: DateRange) => {
+  const period = range ? `${formatDisplayDate(range.start)} – ${formatDisplayDate(range.end)}` : "";
+  const hasCost = items.some((i) => i.cost !== null);
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  return downloadXlsx(`Թոփ ապրանքներ ABC ${period}`, [
+    {
+      name: "ABC",
+      title: ["Թոփ ապրանքներ (ABC)", period],
+      columns: [
+        { header: "#", width: 6, numeric: true },
+        { header: "Ապրանք", width: 46 },
+        { header: "Դաս", width: 7 },
+        { header: "Քանակ", numeric: true, width: 12 },
+        { header: "Եկամուտ", numeric: true },
+        { header: "Մաս, %", numeric: true, width: 10 },
+        { header: "Կուտակային, %", numeric: true, width: 14 },
+        ...(hasCost ? [{ header: "Շահույթ", numeric: true }, { header: "Մարժա, %", numeric: true, width: 11 }] : []),
+      ],
+      rows: items.map((item, idx) => {
+        const profit = item.cost === null ? null : item.revenue - item.cost;
+        const margin = profit === null || item.revenue === 0 ? null : round1((profit / item.revenue) * 100);
+        return {
+          cells: [
+            idx + 1,
+            item.name,
+            item.abc,
+            item.qty,
+            item.revenue,
+            round1(item.share),
+            round1(item.cumulative),
+            ...(hasCost ? [profit, margin] : []),
+          ],
+        };
+      }),
+      total: [null, "Ընդամենը", null, null, total, 100, null, ...(hasCost ? [null, null] : [])],
+    },
+  ]);
+};
+
+export default function AbcTable({ rows, range }: { rows: AbcRow[]; range?: DateRange }) {
   const [filter, setFilter] = useState<AbcClass | null>(null);
   const { items, total } = useMemo(() => buildItems(rows), [rows]);
 
@@ -116,15 +160,15 @@ export default function AbcTable({ rows }: { rows: AbcRow[] }) {
             type="button"
             onClick={() => setFilter(filter === s.abc ? null : s.abc)}
             aria-pressed={filter === s.abc}
-            className={`rounded-lg border p-3 text-left transition-shadow hover:shadow ${
+            className={`rounded-lg border p-2 md:p-3 text-left transition-shadow hover:shadow ${
               filter === s.abc ? "ring-2 ring-primary" : ""
             }`}
           >
             <div className="flex items-center gap-2">
               <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${CLASS_STYLE[s.abc]}`}>{s.abc}</span>
-              <span className="text-xs text-muted-foreground">{CLASS_HINT[s.abc]}</span>
+              <span className="hidden sm:inline text-xs text-muted-foreground">{CLASS_HINT[s.abc]}</span>
             </div>
-            <div className="mt-1 text-lg font-bold text-foreground tabular-nums">{s.count} ապրանք</div>
+            <div className="mt-1 text-base md:text-lg font-bold text-foreground tabular-nums">{s.count} <span className="text-sm md:text-lg">ապրանք</span></div>
             <div className="text-xs text-muted-foreground tabular-nums">
               {formatAmount(s.revenue)} · {percent(s.share)}
             </div>
@@ -136,18 +180,38 @@ export default function AbcTable({ rows }: { rows: AbcRow[] }) {
         <span className="text-sm text-muted-foreground">
           {filter ? `Դաս ${filter}՝ ${visible.length} ապրանք` : `Բոլոր ապրանքները՝ ${items.length}`}
         </span>
-        {filter && (
-          <button
-            type="button"
-            onClick={() => setFilter(null)}
-            className="text-xs font-medium text-primary hover:underline"
-          >
-            Ցույց տալ բոլորը
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {filter && (
+            <button
+              type="button"
+              onClick={() => setFilter(null)}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Ցույց տալ բոլորը
+            </button>
+          )}
+          <ExcelButton onExport={() => exportAbc(items, total, range)} />
+        </div>
       </div>
 
-      <div className="overflow-x-auto -mx-6 px-6">
+      <div className="md:hidden">
+        <MobileRows
+          rows={visible.map((item) => {
+            const profit = item.cost === null ? null : item.revenue - item.cost;
+            return {
+              key: item.name,
+              title: <><span className={`mr-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${CLASS_STYLE[item.abc]}`}>{item.abc}</span>{items.indexOf(item) + 1}. {item.name}</>,
+              value: formatAmount(item.revenue),
+              metrics: [
+                { label: "Մաս", value: percent(item.share) },
+                { label: "Քանակ", value: formatAmount(item.qty) },
+                ...(profit !== null && item.revenue > 0 ? [{ label: "Մարժա", value: percent((profit / item.revenue) * 100), strong: profit < 0 }] : []),
+              ],
+            };
+          })}
+        />
+      </div>
+      <div className="hidden md:block overflow-x-auto -mx-6 px-6">
         <table className="min-w-full border-collapse">
           <thead>
             <tr>

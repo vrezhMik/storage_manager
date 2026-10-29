@@ -3,6 +3,9 @@
 import { Fragment, useState } from "react";
 import { DateRange, formatDisplayDate } from "../components/DateRangeModal";
 import { formatAmount, stickyClass, tdClass, thClass, toNumber } from "../sales/salesData";
+import ExcelButton from "../../components/ExcelButton";
+import MobileRows from "../components/MobileRows";
+import { downloadXlsx } from "../../lib/excel";
 
 // 1C returns { Datestart, Date, Debts: [{ Менеджер, Партнер, ОбъектРасчетов, Валюта,
 // НачальныйОстаток, Увеличение, Уменьшение, КонечныйОстаток }] }.
@@ -87,6 +90,14 @@ const buildGroups = (rows: DebtRow[]) => {
   return { groups, totals };
 };
 
+// Phone cards: the four balance columns as a short list.
+const balanceDetails = (b: Balance, range: DateRange) => [
+  { label: `Սկզբնական մնացորդ (${formatDisplayDate(range.start)})`, value: formatAmount(b.start) },
+  { label: "Ավելացում", value: formatAmount(b.increase) },
+  { label: "Նվազում", value: formatAmount(b.decrease) },
+  { label: `Վերջնական մնացորդ (${formatDisplayDate(range.end)})`, value: formatAmount(b.end), strong: true },
+];
+
 function BalanceCells({ balance, bold }: { balance: Balance; bold?: boolean }) {
   const cls = `${tdClass} ${bold ? "font-semibold" : ""}`;
   return (
@@ -121,12 +132,24 @@ function CurrencyTable({ rows, range, currency }: { rows: DebtRow[]; range: Date
         <button
           type="button"
           onClick={() => setExpanded(allExpanded ? new Set() : new Set(groups.map((g) => g.name)))}
-          className="text-xs font-medium text-primary hover:underline"
+          className="hidden md:inline text-xs font-medium text-primary hover:underline"
         >
           {allExpanded ? "Փակել բոլորը" : "Բացել բոլորը"}
         </button>
       </div>
-      <div className="overflow-x-auto -mx-6 px-6">
+      <div className="md:hidden">
+        <MobileRows
+          rows={groups.map((g) => ({
+            key: g.name,
+            title: g.name,
+            value: formatAmount(g.end),
+            details: balanceDetails(g, range),
+            children: g.partners.map((p) => ({ key: `${g.name}::${p.name}`, title: p.name, value: formatAmount(p.end), details: balanceDetails(p, range) })),
+          }))}
+          total={{ key: "total", title: "Ընդամենը", value: formatAmount(totals.end), details: balanceDetails(totals, range) }}
+        />
+      </div>
+      <div className="hidden md:block overflow-x-auto -mx-6 px-6">
         <table className="min-w-full border-collapse">
           <thead>
             <tr>
@@ -210,8 +233,36 @@ export default function DebtsTable({ rows, range }: { rows: DebtRow[]; range: Da
   });
   const currencies = Array.from(byCurrency.keys()).sort();
 
+  // One sheet per currency, managers with their partners underneath.
+  const exportExcel = () => {
+    const period = `${formatDisplayDate(range.start)} – ${formatDisplayDate(range.end)}`;
+    const cells = (b: Balance) => [b.start, b.increase, b.decrease, b.end];
+    return downloadXlsx(`Պարտքեր ${period}`, currencies.map((currency) => {
+      const { groups, totals } = buildGroups(byCurrency.get(currency)!);
+      return {
+        name: currency || "Պարտքեր",
+        title: [`Պարտքեր${currency ? `, ${currency}` : ""}`, period],
+        columns: [
+          { header: "Մենեջեր / Գործընկեր", width: 42 },
+          { header: `Սկզբնական մնացորդ ${formatDisplayDate(range.start)}`, numeric: true, width: 20 },
+          { header: "Ավելացում", numeric: true },
+          { header: "Նվազում", numeric: true },
+          { header: `Վերջնական մնացորդ ${formatDisplayDate(range.end)}`, numeric: true, width: 20 },
+        ],
+        rows: groups.flatMap((g) => [
+          { cells: [g.name, ...cells(g)], level: 0 as const },
+          ...g.partners.map((p) => ({ cells: [p.name, ...cells(p)], level: 1 as const })),
+        ]),
+        total: ["Ընդամենը", ...cells(totals)],
+      };
+    }));
+  };
+
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <ExcelButton onExport={exportExcel} />
+      </div>
       {currencies.map((currency) => (
         <CurrencyTable
           key={currency || "-"}

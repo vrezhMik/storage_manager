@@ -11,7 +11,7 @@ export default function AbcPageClient() {
       apiPath="abc"
       extractRows={extractAbcRows}
       hrefFor={abcHref}
-      renderRows={(rows) => <AbcTable rows={rows} />}
+      renderRows={(rows, range) => <AbcTable rows={rows} range={range} />}
     />
   );
 }

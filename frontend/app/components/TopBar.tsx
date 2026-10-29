@@ -30,7 +30,7 @@ export default function TopBar() {
   const router = useRouter();
   const pathname = usePathname() || "/";
   const hideHeader =
-    pathname.startsWith("/login") || pathname.startsWith("/api/auth");
+    pathname.startsWith("/login") || pathname.startsWith("/install") || pathname.startsWith("/api/auth");
 
   if (hideHeader) return null;
 
