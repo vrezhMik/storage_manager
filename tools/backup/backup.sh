@@ -4,8 +4,9 @@
 # Result: ~/backups/flexit-YYYY-MM-DD.tar.gz (last 7 kept) and
 # ~/backups/latest.tar.gz, which the office computer downloads.
 #
-# Install (as deploy):  crontab -e  ->
-#   30 3 * * * /var/www/html/storage_manager/tools/backup/backup.sh >> ~/backups/backup.log 2>&1
+# Runs as root (uploaded files belong to www-data) and hands the result to
+# the owner of the backup folder. Install:  sudo crontab -e  ->
+#   30 3 * * * BACKUP_DIR=/home/deploy/backups /var/www/html/storage_manager/tools/backup/backup.sh >> /home/deploy/backups/backup.log 2>&1
 set -euo pipefail
 umask 077
 
@@ -40,6 +41,10 @@ cp "$BACKEND/.env" "$WORK/backend.env"
 tar -czf "$OUT_DIR/flexit-$STAMP.tar.gz" -C "$WORK" database.sql backend.env -C "$BACKEND/storage" app
 cp "$OUT_DIR/flexit-$STAMP.tar.gz" "$OUT_DIR/latest.tar.gz.tmp"
 mv "$OUT_DIR/latest.tar.gz.tmp" "$OUT_DIR/latest.tar.gz"
+
+if [ "$(id -u)" = 0 ]; then
+  chown "$(stat -c %u:%g "$OUT_DIR")" "$OUT_DIR/flexit-$STAMP.tar.gz" "$OUT_DIR/latest.tar.gz"
+fi
 
 find "$OUT_DIR" -name 'flexit-*.tar.gz' -mtime +"$KEEP_DAYS" -delete
 echo "$(date '+%F %T') OK $(du -h "$OUT_DIR/flexit-$STAMP.tar.gz" | cut -f1)"
