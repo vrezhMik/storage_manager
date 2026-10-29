@@ -96,24 +96,30 @@ class KnowledgeBase
     public function search(string $question, int $limit = 6): array
     {
         $query = $this->ollama->embed([$question])[0];
-        $keep = $limit * 5;
-        $best = [];
+        $scores = [];
 
         // Brute-force cosine similarity: fine for a test-sized knowledge base.
-        KbChunk::query()->select(['id', 'embedding'])->orderBy('id')->chunk(500, function ($rows) use ($query, &$best, $keep) {
+        KbChunk::query()->select(['id', 'embedding'])->orderBy('id')->chunk(500, function ($rows) use ($query, &$scores) {
             foreach ($rows as $row) {
                 $vector = KbChunk::unpackVector($row->embedding);
                 $score = 0.0;
                 foreach ($query as $i => $value) {
                     $score += $value * ($vector[$i] ?? 0.0);
                 }
-                $best[$row->id] = $score;
+                $scores[$row->id] = $score;
             }
-            arsort($best);
-            $best = array_slice($best, 0, $keep, true);
         });
 
-        arsort($best);
+        // Meaning alone is weak for exact terms ("Реализация товаров"), so text
+        // that literally contains the words of the question gets a bonus.
+        foreach ($this->keywordBonus($question) as $id => $bonus) {
+            if (isset($scores[$id])) {
+                $scores[$id] = min(1.0, $scores[$id] + $bonus);
+            }
+        }
+
+        arsort($scores);
+        $best = array_slice($scores, 0, $limit * 5, true);
         $chunks = KbChunk::with('source:id,title,type,url,file_path')->whereIn('id', array_keys($best))->get()->keyBy('id');
 
         // One result per section (source + heading), in score order.
@@ -133,6 +139,53 @@ class KnowledgeBase
         }
 
         return array_values(array_map(fn (array $hit) => $hit + $this->sectionText($hit['chunk']), $hits));
+    }
+
+    // Score added to chunks that contain all words / the exact phrase.
+    private const BONUS_ALL_WORDS = 0.15;
+    private const BONUS_PHRASE = 0.25;
+    private const MAX_KEYWORD_HITS = 300;
+
+    /**
+     * Chunks containing every word of the question (original text or its
+     * Armenian translation) => score bonus. Words are cut to a rough stem so
+     * "Реализация товаров" also finds "реализации товара".
+     *
+     * @return array<int, float>
+     */
+    private function keywordBonus(string $question): array
+    {
+        $words = array_values(array_unique(array_filter(
+            preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($question), -1, PREG_SPLIT_NO_EMPTY),
+            fn ($w) => mb_strlen($w) >= 3,
+        )));
+        if ($words === []) {
+            return [];
+        }
+        $words = array_slice($words, 0, 8);
+        $stems = array_map(fn ($w) => mb_strlen($w) > 5 ? mb_substr($w, 0, -2) : $w, $words);
+        $like = fn (string $s) => '%'.addcslashes($s, '%_\\').'%';
+
+        $rows = KbChunk::query()
+            ->select(['id', 'content', 'content_hy'])
+            ->where(function ($q) use ($stems, $like) {
+                foreach ($stems as $stem) {
+                    $q->where(fn ($w) => $w->where('content', 'like', $like($stem))->orWhere('content_hy', 'like', $like($stem)));
+                }
+            })
+            ->limit(self::MAX_KEYWORD_HITS)
+            ->get();
+
+        $phrase = count($words) > 1 ? mb_strtolower(trim(preg_replace('/\s+/u', ' ', $question))) : null;
+        $bonus = [];
+        foreach ($rows as $row) {
+            $text = mb_strtolower($row->content.' '.$row->content_hy);
+            $bonus[$row->id] = $phrase !== null && str_contains(preg_replace('/\s+/u', ' ', $text), $phrase)
+                ? self::BONUS_PHRASE
+                : self::BONUS_ALL_WORDS;
+        }
+
+        return $bonus;
     }
 
     /**
