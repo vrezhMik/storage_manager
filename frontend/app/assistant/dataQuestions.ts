@@ -32,7 +32,8 @@ const clean = (q: string) =>
 const has = (q: string, re: RegExp) => re.test(q);
 
 // "How do I ..." questions belong to the knowledge base, not to the numbers.
-const HOW_TO = /ինչպես|ինչպե|ոնց |որտեղ|ինչու|ինչ է նշանակ|ձևակերպ|կարգավոր|հաշվետվությունը| как | где |зачем|почему|настро|оформ|что такое| how | where | why /;
+// Errors and device problems ("ՀԴՄ սխալ 183") too.
+const HOW_TO = /ինչպես|ինչպե|ոնց |որտեղ|ինչու|ինչ է նշանակ|ինչ անել|ձևակերպ|կարգավոր|հաշվետվությունը|սխալ|չի աշխատ|չի բացվ|չի տպ|խնդիր|հդմ| как | где |зачем|почему|настро|оформ|что такое|что делать|ошибк|не работ|не открыв|не печат|проблем|ккм|ккт| how | where | why |error|problem/;
 
 const ASKS_DATA = // " ըստ " = "by" (per manager, per customer)
   / ըստ | по | ով | ովքեր| ում | որ | որն | որոնք|որքան|ինչքան|քանի|ամենա|թոփ|top|топ|ցույց տուր|ցուցակ|լավագույն|վատագույն| кто | кого |сколько|какой|какие|какая|покажи|список|лучш|худш|больше всего|меньше всего| who | how much | which /;
@@ -148,3 +149,48 @@ export const parseDataQuestion = (question: string, now = new Date()): DataInten
 
 // "How do I ..." questions skip the numbers and go straight to the knowledge base.
 export const looksLikeHowTo = (question: string) => HOW_TO.test(clean(question));
+
+// Ready questions for the "Choose a question" list: each one goes straight
+// to its report, so it can never be misread. Periods are taken when clicked.
+export type QuestionTemplate = { question: string; intent: () => DataIntent };
+export type TemplateGroup = { title: string; questions: QuestionTemplate[] };
+
+const period = (words: string) => parsePeriod(` ${words} `) ?? undefined;
+
+export const QUESTION_TEMPLATES: TemplateGroup[] = [
+  {
+    title: "Վաճառք",
+    questions: [
+      { question: "Որքա՞ն ենք վաճառել այսօր", intent: () => ({ topic: "sales_total", ...period("այսօր") }) },
+      { question: "Որքա՞ն ենք վաճառել այս ամիս", intent: () => ({ topic: "sales_total", ...period("այս ամիս") }) },
+      { question: "Որքա՞ն ենք վաճառել անցյալ ամիս", intent: () => ({ topic: "sales_total", ...period("անցյալ ամիս") }) },
+      { question: "Ո՞վ է այս ամիս ամենաշատը վաճառել", intent: () => ({ topic: "sales_by_manager", ...period("այս ամիս") }) },
+      { question: "Ո՞վ է անցյալ ամիս ամենաշատը վաճառել", intent: () => ({ topic: "sales_by_manager", ...period("անցյալ ամիս") }) },
+      { question: "Վաճառքը ըստ պահեստների այս ամիս", intent: () => ({ topic: "sales_by_warehouse", ...period("այս ամիս"), limit: 20 }) },
+    ],
+  },
+  {
+    title: "Հաճախորդներ",
+    questions: [
+      { question: "Թոփ 10 հաճախորդները այս ամիս", intent: () => ({ topic: "sales_by_partner", ...period("այս ամիս"), limit: 10 }) },
+      { question: "Թոփ 10 հաճախորդները այս տարի", intent: () => ({ topic: "sales_by_partner", ...period("այս տարի"), limit: 10 }) },
+      { question: "Ո՞ր հաճախորդներն են 30 օր չեն գնել", intent: () => ({ topic: "inactive_customers", days: 30, limit: 20 }) },
+      { question: "Ո՞ր հաճախորդներն են 60 օր չեն գնել", intent: () => ({ topic: "inactive_customers", days: 60, limit: 20 }) },
+    ],
+  },
+  {
+    title: "Պարտքեր",
+    questions: [
+      { question: "Ամենամեծ պարտքերը", intent: () => ({ topic: "debts", limit: 10 }) },
+      { question: "Ժամկետանց պարտքերը", intent: () => ({ topic: "overdue", limit: 10 }) },
+    ],
+  },
+  {
+    title: "Ապրանքներ",
+    questions: [
+      { question: "Թոփ 10 ապրանքները այս ամիս", intent: () => ({ topic: "top_items", ...period("այս ամիս"), limit: 10 }) },
+      { question: "Թոփ 10 ապրանքները անցյալ ամիս", intent: () => ({ topic: "top_items", ...period("անցյալ ամիս"), limit: 10 }) },
+      { question: "Ամենաքիչ վաճառված 10 ապրանքները այս ամիս", intent: () => ({ topic: "top_items", ...period("այս ամիս"), order: "asc", limit: 10 }) },
+    ],
+  },
+];

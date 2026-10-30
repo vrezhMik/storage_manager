@@ -5,7 +5,7 @@ import AuthGuard from "../components/AuthGuard";
 import { API_BASE, authFetch, getUserSections } from "../lib/auth";
 import DataAnswerCard from "./DataAnswerCard";
 import { answerDataQuestion, DataAnswer } from "./dataAnswers";
-import { DataIntent, looksLikeHowTo, parseDataQuestion } from "./dataQuestions";
+import { DataIntent, looksLikeHowTo, parseDataQuestion, QUESTION_TEMPLATES, QuestionTemplate, TemplateGroup } from "./dataQuestions";
 
 export type AssistantResult = {
   score: number;
@@ -215,15 +215,31 @@ type ViewProps = {
   onAsk: (question: string, knowledgeBaseOnly?: boolean) => void;
   response: AssistantResponse | null;
   dataAnswer?: DataAnswer | null;
+  dataOffer?: { label: string; onShow: () => void } | null;
   loading: boolean;
   error: string | null;
   history: string[];
   examples?: string[];
+  // Ready data questions ("Choose a question"); hidden without report access.
+  templates?: TemplateGroup[];
+  onTemplate?: (template: QuestionTemplate) => void;
 };
 
 // Presentation only, so it can be rendered without the API.
-export function AssistantView({ onAsk, response, dataAnswer, loading, error, history, examples = EXAMPLES }: ViewProps) {
+export function AssistantView({
+  onAsk,
+  response,
+  dataAnswer,
+  dataOffer,
+  loading,
+  error,
+  history,
+  examples = EXAMPLES,
+  templates,
+  onTemplate,
+}: ViewProps) {
   const [question, setQuestion] = useState("");
+  const [showTemplates, setShowTemplates] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const submit = (text: string) => {
@@ -262,7 +278,18 @@ export function AssistantView({ onAsk, response, dataAnswer, loading, error, his
                 className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">Enter՝ ուղարկել, Shift+Enter՝ նոր տող</span>
+                {templates && templates.length > 0 && onTemplate ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowTemplates((v) => !v)}
+                    aria-expanded={showTemplates}
+                    className="inline-flex items-center gap-1 rounded-md border border-input px-3 py-2 text-sm font-medium hover:bg-accent"
+                  >
+                    📋 Ընտրեք հարցը
+                  </button>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Enter՝ ուղարկել, Shift+Enter՝ նոր տող</span>
+                )}
                 <button
                   type="submit"
                   disabled={loading || question.trim().length < 3}
@@ -272,7 +299,33 @@ export function AssistantView({ onAsk, response, dataAnswer, loading, error, his
                 </button>
               </div>
             </form>
-            {!response && !dataAnswer && !loading && (
+            {showTemplates && templates && onTemplate && (
+              <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-3 sm:grid-cols-2">
+                {templates.map((group) => (
+                  <div key={group.title} className="space-y-1.5">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.title}</div>
+                    <div className="flex flex-col items-start gap-1">
+                      {group.questions.map((t) => (
+                        <button
+                          key={t.question}
+                          type="button"
+                          disabled={loading}
+                          onClick={() => {
+                            setQuestion(t.question);
+                            setShowTemplates(false);
+                            onTemplate(t);
+                          }}
+                          className="text-left text-sm text-primary hover:underline disabled:opacity-50"
+                        >
+                          {t.question}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!response && !dataAnswer && !loading && !showTemplates && (
               <div className="flex flex-wrap gap-2">
                 {(history.length > 0 ? history : examples).map((q) => (
                   <button
@@ -301,7 +354,17 @@ export function AssistantView({ onAsk, response, dataAnswer, loading, error, his
           ) : dataAnswer ? (
             <DataAnswerCard answer={dataAnswer} onSearchKb={() => onAsk(question, true)} />
           ) : response ? (
-            <Results response={response} />
+            <div className="space-y-3">
+              {dataOffer && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed bg-card px-4 py-3 text-sm">
+                  <span className="text-muted-foreground">Գուցե ուզում էիք տեսնել 1C տվյալները՝ «{dataOffer.label}»</span>
+                  <button type="button" onClick={dataOffer.onShow} className="text-xs font-medium text-primary hover:underline">
+                    Ցույց տալ
+                  </button>
+                </div>
+              )}
+              <Results response={response} />
+            </div>
           ) : null}
         </div>
       </main>
@@ -309,14 +372,21 @@ export function AssistantView({ onAsk, response, dataAnswer, loading, error, his
   );
 }
 
-// A data question goes to 1C: the built-in rules read it first (fast, no
-// server load); otherwise the server's chat model, when one is set up,
-// decides whether it is about the numbers. Everything else is searched in
-// the knowledge base.
-const readIntent = async (question: string, signal: AbortSignal): Promise<DataIntent | null> => {
-  const local = parseDataQuestion(question);
-  if (local) return local;
-  if (looksLikeHowTo(question)) return null;
+const TOPIC_LABELS: Record<string, string> = {
+  sales_total: "Վաճառք",
+  sales_by_manager: "Վաճառք ըստ մենեջերների",
+  sales_by_partner: "Վաճառք ըստ հաճախորդների",
+  sales_by_warehouse: "Վաճառք ըստ պահեստների",
+  top_items: "Թոփ ապրանքներ",
+  debts: "Պարտքեր",
+  overdue: "Ժամկետանց պարտքեր",
+  inactive_customers: "Չգնող հաճախորդներ",
+  customer: "Հաճախորդի տվյալներ",
+};
+
+// The server's chat model, when one is set up, for data questions the
+// built-in rules did not recognise. null = not about the numbers (or no model).
+const askModel = async (question: string, signal: AbortSignal): Promise<DataIntent | null> => {
   try {
     const res = await authFetch<{ engine?: string; intent?: DataIntent | null }>(`${API_BASE}/assistant/intent`, {
       method: "POST",
@@ -331,9 +401,18 @@ const readIntent = async (question: string, signal: AbortSignal): Promise<DataIn
   }
 };
 
+const searchKb = (question: string, signal: AbortSignal) =>
+  authFetch<AssistantResponse>(`${API_BASE}/assistant/search`, {
+    method: "POST",
+    body: JSON.stringify({ question }),
+    signal,
+  }).then((data) => data ?? { question, results: [] });
+
 export default function AssistantClient() {
   const [response, setResponse] = useState<AssistantResponse | null>(null);
   const [dataAnswer, setDataAnswer] = useState<DataAnswer | null>(null);
+  // A report the chat model suggested while the knowledge base had an answer.
+  const [dataOffer, setDataOffer] = useState<{ intent: DataIntent; question: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<string[]>([]);
@@ -342,33 +421,14 @@ export default function AssistantClient() {
 
   useEffect(() => () => requestRef.current?.abort(), []);
 
-  const ask = async (question: string, knowledgeBaseOnly = false) => {
+  const run = async (work: (signal: AbortSignal) => Promise<void>) => {
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
     setLoading(true);
     setError(null);
-    setHistory((prev) => [question, ...prev.filter((q) => q !== question)].slice(0, 5));
     try {
-      if (canSeeData && !knowledgeBaseOnly) {
-        const intent = await readIntent(question, controller.signal);
-        const answer = intent ? await answerDataQuestion(intent, question) : null;
-        if (controller.signal.aborted) return;
-        if (answer) {
-          setResponse(null);
-          setDataAnswer(answer);
-          return;
-        }
-      }
-      const data = await authFetch<AssistantResponse>(`${API_BASE}/assistant/search`, {
-        method: "POST",
-        body: JSON.stringify({ question }),
-        signal: controller.signal,
-      });
-      if (!controller.signal.aborted) {
-        setDataAnswer(null);
-        setResponse(data ?? { question, results: [] });
-      }
+      await work(controller.signal);
     } catch (err: any) {
       if (controller.signal.aborted || err?.name === "AbortError") return;
       console.error("Assistant failed", err);
@@ -382,16 +442,74 @@ export default function AssistantClient() {
     }
   };
 
+  const show = (next: { response?: AssistantResponse; data?: DataAnswer; offer?: { intent: DataIntent; question: string } }) => {
+    setResponse(next.response ?? null);
+    setDataAnswer(next.data ?? null);
+    setDataOffer(next.offer ?? null);
+  };
+
+  // Built-in rules first (fast, sure). Otherwise the knowledge base and the
+  // chat model are asked together; the knowledge base wins when it has a real
+  // answer, because a small model sometimes takes e.g. "ՀԴՄ սխալ 183" for a
+  // report question.
+  const ask = (question: string, knowledgeBaseOnly = false) => {
+    setHistory((prev) => [question, ...prev.filter((q) => q !== question)].slice(0, 5));
+    return run(async (signal) => {
+      const useData = canSeeData && !knowledgeBaseOnly;
+      const rules = useData ? parseDataQuestion(question) : null;
+      if (rules) {
+        const data = await answerDataQuestion(rules, question);
+        if (signal.aborted) return;
+        if (data) return show({ data });
+      }
+
+      const modelIntent = useData && !looksLikeHowTo(question) ? askModel(question, signal) : Promise.resolve(null);
+      const [kb, intent] = await Promise.all([searchKb(question, signal).catch((err) => err as Error), modelIntent]);
+      if (signal.aborted) return;
+      const kbOk = !(kb instanceof Error);
+      const kbHasAnswer = kbOk && kb.results.some((r) => r.relevant !== false);
+
+      if (intent && !kbHasAnswer) {
+        const data = await answerDataQuestion(intent, question);
+        if (signal.aborted) return;
+        if (data) return show({ data });
+      }
+      if (!kbOk) throw kb;
+      show({ response: kb, offer: intent ? { intent, question } : undefined });
+    });
+  };
+
+  // A ready question: straight to its report, no rules or model involved.
+  const askTemplate = (template: QuestionTemplate) => {
+    setHistory((prev) => [template.question, ...prev.filter((q) => q !== template.question)].slice(0, 5));
+    return run(async (signal) => {
+      const data = await answerDataQuestion(template.intent(), template.question);
+      if (!signal.aborted && data) show({ data });
+    });
+  };
+
+  const showOffer = () => {
+    if (!dataOffer) return;
+    const { intent, question } = dataOffer;
+    return run(async (signal) => {
+      const data = await answerDataQuestion(intent, question);
+      if (!signal.aborted && data) show({ data });
+    });
+  };
+
   return (
     <AuthGuard section="assistant">
       <AssistantView
         onAsk={ask}
         response={response}
         dataAnswer={dataAnswer}
+        dataOffer={dataOffer ? { label: TOPIC_LABELS[dataOffer.intent.topic] ?? "1C տվյալներ", onShow: showOffer } : null}
         loading={loading}
         error={error}
         history={history}
         examples={canSeeData ? [...DATA_EXAMPLES, ...EXAMPLES] : EXAMPLES}
+        templates={canSeeData ? QUESTION_TEMPLATES : undefined}
+        onTemplate={askTemplate}
       />
     </AuthGuard>
   );

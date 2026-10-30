@@ -68,7 +68,13 @@ Pick "topic":
 - overdue: debts past their due date
 - inactive_customers: customers who stopped buying ("who has not bought for 30 days")
 - customer: everything about ONE named customer (put its name in "partner")
-- none: anything else, e.g. how to do something in 1C, definitions, instructions
+- none: anything else, e.g. how to do something in 1C, definitions, instructions,
+  error messages and codes, problems with programs or devices (cash registers,
+  "ՀԴՄ", "ККМ", printers), settings
+Choose a report topic ONLY when the question clearly asks for the company's
+numbers (amounts, rankings, lists of customers, managers or goods). A number in
+the question alone (like an error code) does not make it a report question.
+When unsure, answer "none".
 
 Other fields:
 - start, end: period as YYYY-MM-DD. "this month" = first day of this month..today;
