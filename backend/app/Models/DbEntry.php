@@ -27,5 +27,6 @@ class DbEntry extends Model
         'api_overdue_debts',
         'api_sales_monthly',
         'api_retail_plan',
+        'api_retail_suppliers',
     ];
 }

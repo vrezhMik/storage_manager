@@ -96,6 +96,10 @@ class DbEntryResource extends Resource
                 ->label('API: Retail Plan')
                 ->helperText('Date is filled in as DD.MM.YYYY, e.g. http://host:port/terminal/hs/Eportal/RetailPlan?Date=')
                 ->maxLength(255),
+            Forms\Components\TextInput::make('api_retail_suppliers')
+                ->label('API: Retail Suppliers')
+                ->helperText('Date (DD.MM.YYYY), Days and the user\'s Store are filled in, e.g. http://host:port/terminal/hs/Eportal/RetailSuppliers?Date=')
+                ->maxLength(255),
         ]);
     }
 
@@ -163,6 +167,10 @@ class DbEntryResource extends Resource
                     ->tooltip(fn ($state) => $state),
                 Tables\Columns\TextColumn::make('api_retail_plan')
                     ->label('Retail Plan API')
+                    ->limit(50)
+                    ->tooltip(fn ($state) => $state),
+                Tables\Columns\TextColumn::make('api_retail_suppliers')
+                    ->label('Retail Suppliers API')
                     ->limit(50)
                     ->tooltip(fn ($state) => $state),
                 Tables\Columns\TextColumn::make('created_at')

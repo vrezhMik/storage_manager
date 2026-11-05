@@ -249,13 +249,50 @@ class OrderController extends Controller
             return $date;
         }
 
-        $query = ['Date' => $date->format('d.m.Y')];
+        return $this->proxy($request, 'retail plan', $this->withUserStore($request, ['Date' => $date->format('d.m.Y')]));
+    }
+
+    /**
+     * Supplier deliveries to the user's store: posted goods receipts of the
+     * ?days (30..365, default 90) days up to ?date -> Date, Days, Store for 1C.
+     * The terminal works out each supplier's rhythm and lateness from them.
+     */
+    public function retailSuppliers(Request $request): Response
+    {
+        $date = $this->optionalDate($request);
+        if ($date instanceof Response) {
+            return $date;
+        }
+
+        $days = filter_var($request->query('days', 90), FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 30, 'max_range' => 365],
+        ]);
+
+        if ($days === false) {
+            return response()->json([
+                'message' => 'Invalid days, expected a number from 30 to 365',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        return $this->proxy($request, 'retail suppliers', $this->withUserStore($request, [
+            'Date' => $date->format('d.m.Y'),
+            'Days' => $days,
+        ]));
+    }
+
+    /**
+     * Adds Store=<the user's store> for 1C. The store always comes from the
+     * account, never from the request, so a store user sees only its own
+     * store; users without a store get all stores.
+     */
+    private function withUserStore(Request $request, array $query): array
+    {
         $store = trim((string) $request->user()?->retail_store);
         if ($store !== '') {
             $query['Store'] = $store;
         }
 
-        return $this->proxy($request, 'retail plan', $query);
+        return $query;
     }
 
     /**
@@ -371,6 +408,7 @@ class OrderController extends Controller
             'overdue debts' => $dbEntry->api_overdue_debts,
             'sales monthly' => $dbEntry->api_sales_monthly,
             'retail plan' => $dbEntry->api_retail_plan,
+            'retail suppliers' => $dbEntry->api_retail_suppliers,
             default => $dbEntry->api_get_orders,
         };
 

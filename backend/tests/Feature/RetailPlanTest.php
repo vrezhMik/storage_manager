@@ -24,6 +24,7 @@ class RetailPlanTest extends TestCase
             'api_post_orders' => 'http://1c.test/orders',
             'api_post_purchases' => 'http://1c.test/purchases',
             'api_retail_plan' => 'http://1c.test/terminal/hs/Eportal/RetailPlan?Date=',
+            'api_retail_suppliers' => 'http://1c.test/terminal/hs/Eportal/RetailSuppliers?Date=',
         ]);
 
         return User::create([
@@ -76,6 +77,31 @@ class RetailPlanTest extends TestCase
             ->assertOk();
 
         Http::assertSent(fn ($request) => $request['Store'] === 'Մաշտոց 12');
+    }
+
+    public function test_suppliers_use_the_users_store_and_90_days_by_default(): void
+    {
+        Http::fake(['1c.test/*' => Http::response(['Deliveries' => [], 'Items' => []])]);
+        $user = $this->userWithRetail(true, 'Մաշտոց 12');
+
+        $this->getJson('/api/retail-suppliers?date=2026-11-06&Store=Կոմիտաս', ['Authorization' => 'Bearer '.$this->token($user)])
+            ->assertOk();
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'RetailSuppliers')
+            && $request['Date'] === '06.11.2026'
+            && (int) $request['Days'] === 90
+            && $request['Store'] === 'Մաշտոց 12');
+    }
+
+    public function test_suppliers_need_the_retail_section_and_valid_days(): void
+    {
+        $other = $this->userWithRetail(false);
+        $this->getJson('/api/retail-suppliers', ['Authorization' => 'Bearer '.$this->token($other)])
+            ->assertForbidden();
+
+        $other->update(['can_retail' => true]);
+        $this->getJson('/api/retail-suppliers?days=5', ['Authorization' => 'Bearer '.$this->token($other)])
+            ->assertUnprocessable();
     }
 
     public function test_rejects_a_bad_date(): void

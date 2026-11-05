@@ -1,6 +1,8 @@
 "use client";
 
 import { ReactNode, useEffect, useMemo, useState } from "react";
+import type { Route } from "next";
+import Link from "next/link";
 import AuthGuard from "../components/AuthGuard";
 import { API_BASE, authFetch } from "../lib/auth";
 import { formatDisplayDate } from "../reports/components/DateRangeModal";
@@ -159,14 +161,22 @@ export function RetailView({ date, onDateChange, data, loading, error }: ViewPro
                 Պլանի կատարում · {month.label} · {formatDisplayDate(date)} դրությամբ
               </p>
             </div>
-            <input
-              type="date"
-              value={date}
-              max={today()}
-              onChange={(e) => e.target.value && onDateChange(e.target.value)}
-              className="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              aria-label="Ամսաթիվ"
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                href={`/retail/suppliers/?date=${date}` as Route}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+              >
+                🚚 Մատակարարներ
+              </Link>
+              <input
+                type="date"
+                value={date}
+                max={today()}
+                onChange={(e) => e.target.value && onDateChange(e.target.value)}
+                className="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                aria-label="Ամսաթիվ"
+              />
+            </div>
           </div>
 
           {error ? (
