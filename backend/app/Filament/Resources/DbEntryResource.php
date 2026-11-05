@@ -100,6 +100,20 @@ class DbEntryResource extends Resource
                 ->label('API: Retail Suppliers')
                 ->helperText('Date (DD.MM.YYYY), Days and the user\'s Store are filled in, e.g. http://host:port/terminal/hs/Eportal/RetailSuppliers?Date=')
                 ->maxLength(255),
+            Forms\Components\TextInput::make('einvoice_tin')
+                ->label('E-invoicing: ՀՎՀՀ (TIN)')
+                ->helperText('The company\'s 8-digit TIN in e-invoicing.taxservice.am')
+                ->regex('/^\d{8}$/')
+                ->maxLength(8),
+            Forms\Components\TextInput::make('einvoice_login')
+                ->label('E-invoicing: login')
+                ->maxLength(255),
+            Forms\Components\TextInput::make('einvoice_password')
+                ->label('E-invoicing: password')
+                ->password()
+                ->helperText('Stored encrypted. Leave empty to keep the current password.')
+                ->dehydrated(fn ($state) => filled($state))
+                ->maxLength(255),
         ]);
     }
 

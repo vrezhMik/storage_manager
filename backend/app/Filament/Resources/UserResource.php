@@ -76,6 +76,29 @@ class UserResource extends Resource
                     Forms\Components\Checkbox::make('can_retail')
                         ->label('Մանրածախ (Retail)')
                         ->default(false),
+                    Forms\Components\Checkbox::make('can_sales')
+                        ->label('Վաճառքներ (Sales, e-invoicing)')
+                        ->default(false),
+                    Forms\Components\TextInput::make('cosign_username')
+                        ->label('CoSign login (e-signature)')
+                        ->helperText('E-invoicing signing: fill in ONE of CoSign, Mobile ID or Nikita (this person\'s own). CoSign is used first if several are filled.')
+                        ->maxLength(255),
+                    Forms\Components\TextInput::make('cosign_password')
+                        ->label('CoSign password')
+                        ->password()
+                        ->helperText('Stored encrypted. Leave empty to keep the current password.')
+                        ->dehydrated(fn ($state) => filled($state))
+                        ->maxLength(255),
+                    Forms\Components\TextInput::make('mobile_id_phone')
+                        ->label('Mobile ID phone')
+                        ->helperText('Phone with Mobile ID on the SIM, e.g. 37491123456. The user confirms on the phone.')
+                        ->tel()
+                        ->maxLength(20),
+                    Forms\Components\TextInput::make('nikita_phone')
+                        ->label('Nikita phone')
+                        ->helperText('Phone with the Nikita app, e.g. 37491123456. The user confirms in the app.')
+                        ->tel()
+                        ->maxLength(20),
                     Forms\Components\TextInput::make('retail_store')
                         ->label('Retail store (Խանութ)')
                         ->helperText('Store (warehouse) name exactly as in 1C. The user sees only this store. Empty = all stores.')
@@ -122,6 +145,7 @@ class UserResource extends Resource
                             'can_dashboard' => 'Flexit Դաշբորդ',
                             'can_assistant' => 'Flexik օգնական',
                             'can_retail' => 'Մանրածախ',
+                            'can_sales' => 'Վաճառքներ',
                         ])->filter(fn ($label, $column) => (bool) $record->{$column})->values()->all())
                         ->badge()
                         ->placeholder('—'),

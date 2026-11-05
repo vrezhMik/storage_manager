@@ -8,6 +8,7 @@ import ArrowUpFromLineIcon from "./UI/ArrowUpFromLineIcon";
 import ChartIcon from "./UI/ChartIcon";
 import DashboardIcon from "./UI/DashboardIcon";
 import SparklesIcon from "./UI/SparklesIcon";
+import ReceiptIcon from "./UI/ReceiptIcon";
 import StoreIcon from "./UI/StoreIcon";
 import TagIcon from "./UI/TagIcon";
 import AuthGuard, { SECTIONS_CHANGED_EVENT } from "./components/AuthGuard";
@@ -21,6 +22,7 @@ const SECTION_LINKS: {
 }[] = [
   { section: "dashboard", href: "/dashboard", label: "Flexit Դաշբորդ", Icon: DashboardIcon },
   { section: "retail", href: "/retail", label: "Մանրածախ", Icon: StoreIcon },
+  { section: "sales", href: "/sales", label: "Վաճառքներ", Icon: ReceiptIcon },
   { section: "documents_in", href: "/documents/in", label: "Մուտքեր", Icon: ArrowDownToLineIcon },
   { section: "documents_out", href: "/documents/out", label: "Ելքեր", Icon: ArrowUpFromLineIcon },
   { section: "reports", href: "/reports", label: "Հաշվետվություններ", Icon: ChartIcon },

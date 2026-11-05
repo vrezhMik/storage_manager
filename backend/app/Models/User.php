@@ -36,6 +36,11 @@ class User extends Authenticatable implements FilamentUser
         'can_assistant',
         'can_retail',
         'retail_store',
+        'can_sales',
+        'cosign_username',
+        'cosign_password',
+        'mobile_id_phone',
+        'nikita_phone',
     ];
 
     /**
@@ -49,12 +54,13 @@ class User extends Authenticatable implements FilamentUser
         'dashboard' => 'can_dashboard',
         'assistant' => 'can_assistant',
         'retail' => 'can_retail',
+        'sales' => 'can_sales',
     ];
 
     /**
      * Sections that stay hidden when their column has no value yet.
      */
-    private const SECTIONS_OFF_BY_DEFAULT = ['dashboard', 'assistant', 'retail'];
+    private const SECTIONS_OFF_BY_DEFAULT = ['dashboard', 'assistant', 'retail', 'sales'];
 
     protected $appends = ['sections'];
 
@@ -66,6 +72,7 @@ class User extends Authenticatable implements FilamentUser
     protected $hidden = [
         'password',
         'remember_token',
+        'cosign_password',
     ];
 
     /**
@@ -78,6 +85,7 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'cosign_password' => 'encrypted',
             'allow_manual_items' => 'boolean',
             'allow_manual_text_input' => 'boolean',
             'can_documents_in' => 'boolean',
@@ -87,6 +95,7 @@ class User extends Authenticatable implements FilamentUser
             'can_dashboard' => 'boolean',
             'can_assistant' => 'boolean',
             'can_retail' => 'boolean',
+            'can_sales' => 'boolean',
         ];
     }
 
@@ -108,6 +117,25 @@ class User extends Authenticatable implements FilamentUser
     public function canUseSection(string $section): bool
     {
         return $this->sections[$section] ?? false;
+    }
+
+    /**
+     * How this user signs e-invoicing documents: the first one filled in of
+     * CoSign (login + password), Mobile ID (phone), Nikita (phone); null = none.
+     */
+    public function signMethod(): ?string
+    {
+        return match (true) {
+            filled($this->cosign_username) && filled($this->cosign_password) => 'cosign',
+            filled($this->mobile_id_phone) => 'mobile_id',
+            filled($this->nikita_phone) => 'nikita',
+            default => null,
+        };
+    }
+
+    public function canSignEinvoices(): bool
+    {
+        return $this->signMethod() !== null;
     }
 
     public function dbEntry(): BelongsTo

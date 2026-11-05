@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\SalesController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -27,6 +28,13 @@ Route::middleware(['auth.jwt', 'section:reports'])->get('overdue-debts', [OrderC
 Route::middleware(['auth.jwt', 'section:reports'])->get('sales-monthly', [OrderController::class, 'salesMonthly']);
 Route::middleware(['auth.jwt', 'section:retail'])->get('retail-plan', [OrderController::class, 'retailPlan']);
 Route::middleware(['auth.jwt', 'section:retail'])->get('retail-suppliers', [OrderController::class, 'retailSuppliers']);
+Route::middleware(['auth.jwt', 'section:sales'])->prefix('sales')->group(function (): void {
+    Route::get('taxpayer', [SalesController::class, 'taxpayer']);
+    Route::get('documents', [SalesController::class, 'documents']);
+    Route::post('documents', [SalesController::class, 'store']);
+    Route::post('documents/{document}/sign', [SalesController::class, 'sign']);
+    Route::get('documents/{document}/sign-status', [SalesController::class, 'signStatus']);
+});
 Route::middleware(['auth.jwt', 'section:assistant'])->post('assistant/search', [AssistantController::class, 'search']);
 Route::middleware(['auth.jwt', 'section:assistant'])->post('assistant/intent', [AssistantController::class, 'intent']);
 Route::middleware(['auth.jwt', 'section:assistant'])->get('assistant/image/{source}', [AssistantController::class, 'image']);

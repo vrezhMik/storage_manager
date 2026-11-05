@@ -28,5 +28,25 @@ class DbEntry extends Model
         'api_sales_monthly',
         'api_retail_plan',
         'api_retail_suppliers',
+        'einvoice_tin',
+        'einvoice_login',
+        'einvoice_password',
     ];
+
+    // The e-invoicing password never leaves the server.
+    protected $hidden = [
+        'einvoice_password',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'einvoice_password' => 'encrypted',
+        ];
+    }
+
+    public function hasEinvoiceAccount(): bool
+    {
+        return filled($this->einvoice_tin) && filled($this->einvoice_login) && filled($this->einvoice_password);
+    }
 }
