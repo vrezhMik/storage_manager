@@ -92,6 +92,10 @@ class DbEntryResource extends Resource
                 ->label('API: Sales by Month')
                 ->helperText('Datestart and Date are filled in as DD.MM.YYYY, e.g. http://host:port/terminal/hs/Eportal/SalesMonthly?Datestart=&Date=')
                 ->maxLength(255),
+            Forms\Components\TextInput::make('api_retail_plan')
+                ->label('API: Retail Plan')
+                ->helperText('Date is filled in as DD.MM.YYYY, e.g. http://host:port/terminal/hs/Eportal/RetailPlan?Date=')
+                ->maxLength(255),
         ]);
     }
 
@@ -155,6 +159,10 @@ class DbEntryResource extends Resource
                     ->tooltip(fn ($state) => $state),
                 Tables\Columns\TextColumn::make('api_sales_monthly')
                     ->label('Sales by Month API')
+                    ->limit(50)
+                    ->tooltip(fn ($state) => $state),
+                Tables\Columns\TextColumn::make('api_retail_plan')
+                    ->label('Retail Plan API')
                     ->limit(50)
                     ->tooltip(fn ($state) => $state),
                 Tables\Columns\TextColumn::make('created_at')

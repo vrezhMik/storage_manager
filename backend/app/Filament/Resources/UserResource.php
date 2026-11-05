@@ -73,6 +73,13 @@ class UserResource extends Resource
                     Forms\Components\Checkbox::make('can_assistant')
                         ->label('Flexik օգնական (Assistant)')
                         ->default(false),
+                    Forms\Components\Checkbox::make('can_retail')
+                        ->label('Մանրածախ (Retail)')
+                        ->default(false),
+                    Forms\Components\TextInput::make('retail_store')
+                        ->label('Retail store (Խանութ)')
+                        ->helperText('Store (warehouse) name exactly as in 1C. The user sees only this store. Empty = all stores.')
+                        ->maxLength(255),
                 ]),
             Forms\Components\Select::make('db_entry_id')
                 ->label('DB Config')
@@ -114,6 +121,7 @@ class UserResource extends Resource
                             'can_price_check' => 'Գնի հարցում',
                             'can_dashboard' => 'Flexit Դաշբորդ',
                             'can_assistant' => 'Flexik օգնական',
+                            'can_retail' => 'Մանրածախ',
                         ])->filter(fn ($label, $column) => (bool) $record->{$column})->values()->all())
                         ->badge()
                         ->placeholder('—'),

@@ -236,6 +236,29 @@ class OrderController extends Controller
     }
 
     /**
+     * Retail plan for the month of ?date=YYYY-MM-DD (optional, defaults to
+     * today) -> Date=DD.MM.YYYY for 1C: sales from the 1st of the month up to
+     * that date and the month's plan. The store comes from the user's account
+     * (Store=...), never from the request, so a store user sees only its own
+     * store; users without a store get all stores.
+     */
+    public function retailPlan(Request $request): Response
+    {
+        $date = $this->optionalDate($request);
+        if ($date instanceof Response) {
+            return $date;
+        }
+
+        $query = ['Date' => $date->format('d.m.Y')];
+        $store = trim((string) $request->user()?->retail_store);
+        if ($store !== '') {
+            $query['Store'] = $store;
+        }
+
+        return $this->proxy($request, 'retail plan', $query);
+    }
+
+    /**
      * ?date=YYYY-MM-DD (optional) &days=N (1..3650, default 60) -> Date / Days for 1C.
      */
     public function frozenStock(Request $request): Response
@@ -347,6 +370,7 @@ class OrderController extends Controller
             'abc' => $dbEntry->api_abc,
             'overdue debts' => $dbEntry->api_overdue_debts,
             'sales monthly' => $dbEntry->api_sales_monthly,
+            'retail plan' => $dbEntry->api_retail_plan,
             default => $dbEntry->api_get_orders,
         };
 
