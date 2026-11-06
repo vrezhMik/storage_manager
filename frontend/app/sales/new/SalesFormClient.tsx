@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatAmount } from "../../reports/sales/salesData";
-import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, SrcSessionError, srcFetch, TYPE_LABELS } from "../salesShared";
+import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, hasSrcExtension, SrcSessionError, srcFetch, TYPE_LABELS } from "../salesShared";
 
 // The form for a new account document (հաշիվ-վավերագիր): saved in e-invoicing
 // as a draft, and signed right away when the user has a signing method.
@@ -77,7 +77,9 @@ export function SalesFormView() {
         busy: false,
         error:
           err instanceof SrcSessionError
-            ? "Մուտք գործեք file-online.taxservice.am (այս նույն բրաուզերում) և կրկին սեղմեք «Գտնել ՊԵԿ-ում»։"
+            ? hasSrcExtension()
+              ? "Մուտք գործեք file-online.taxservice.am (այս նույն բրաուզերում), բացեք e-invoicing բաժինը և կրկին սեղմեք «Գտնել ՊԵԿ-ում»։"
+              : "ՊԵԿ-ի հետ սարքից աշխատելու համար տեղադրեք «Flexit ՊԵԿ կապ» Chrome ընդլայնումը։"
             : `ՊԵԿ-ի հետ կապ չստացվեց. ${(err as Error).message}`,
       });
     }

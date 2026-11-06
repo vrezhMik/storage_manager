@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Flexit ՊԵԿ կապ",
+  "version": "1.0.0",
+  "description": "Lets the Flexit terminal talk to the tax service's e-invoicing from this computer, with your own file-online session and IP.",
+  "host_permissions": ["https://e-invoicing.taxservice.am/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://terminal.flexit.am/*", "http://terminal.loc/*", "http://localhost:3000/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

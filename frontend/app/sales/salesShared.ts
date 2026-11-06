@@ -47,21 +47,51 @@ export type SrcAnswer = { ok: boolean; payload: unknown; failure?: { code?: stri
 
 export class SrcSessionError extends Error {}
 
-export const srcFetch = async (path: string, payload: Record<string, unknown>): Promise<SrcAnswer> => {
-  const res = await fetch(`${SRC_API}/${path}`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ payload }),
+// The "Flexit ՊԵԿ կապ" Chrome extension (tools/chrome-extension) marks the
+// page; a plain browser page cannot send the e-invoicing session itself.
+export const hasSrcExtension = () => typeof document !== "undefined" && document.documentElement.dataset.flexitSrc === "1";
+
+// Sends the request through the extension; resolves with {status, body}.
+const viaExtension = (path: string, payload: Record<string, unknown>) =>
+  new Promise<{ status: number; body: string }>((resolve, reject) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    const timer = window.setTimeout(() => {
+      window.removeEventListener("message", onMessage);
+      reject(new Error("The extension did not answer"));
+    }, 30000);
+    function onMessage(event: MessageEvent) {
+      if (event.source !== window || event.data?.type !== "FLEXIT_SRC_RESPONSE" || event.data.id !== id) return;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      if (event.data.error) reject(new Error(event.data.error));
+      else resolve({ status: event.data.status, body: event.data.body ?? "" });
+    }
+    window.addEventListener("message", onMessage);
+    window.postMessage({ type: "FLEXIT_SRC_REQUEST", id, path, payload }, window.location.origin);
   });
-  if (res.status === 401 || res.status === 403) {
-    throw new SrcSessionError(`Not signed in to e-invoicing (HTTP ${res.status})`);
+
+export const srcFetch = async (path: string, payload: Record<string, unknown>): Promise<SrcAnswer> => {
+  let status: number;
+  let text: string;
+  if (hasSrcExtension()) {
+    ({ status, body: text } = await viaExtension(path, payload));
+  } else {
+    const res = await fetch(`${SRC_API}/${path}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ payload }),
+    });
+    status = res.status;
+    text = await res.text();
   }
-  const text = await res.text();
+  if (status === 401 || status === 403 || /JWT token is not provided/i.test(text)) {
+    throw new SrcSessionError(`Not signed in to e-invoicing (HTTP ${status})`);
+  }
   try {
     return JSON.parse(text) as SrcAnswer;
   } catch {
-    throw new Error(`Unexpected answer from e-invoicing (HTTP ${res.status}): ${text.slice(0, 200)}`);
+    throw new Error(`Unexpected answer from e-invoicing (HTTP ${status}): ${text.slice(0, 200)}`);
   }
 };
 
