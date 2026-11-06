@@ -15,6 +15,7 @@ export type HdmItem = {
   discount?: number;
   discountType?: number;
   receiptProductId?: number;
+  emarks?: string[];
 };
 
 export type HdmReceipt = {

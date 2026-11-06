@@ -9,6 +9,7 @@ import { API_BASE, authFetch } from "../../lib/auth";
 import { formatAmount } from "../../reports/sales/salesData";
 import { cardClass } from "../salesShared";
 import SalesTabs from "../SalesTabs";
+import { showEmark } from "./EmarkScanner";
 import HdmReceiptView, { printReceipt, useEscape } from "./HdmReceiptView";
 import { hdmError, HdmMode, HdmReceipt, MODE_NOTICE, num, round2 } from "./hdmShared";
 
@@ -56,7 +57,18 @@ function ReceiptModal({ receipt, onClose, onReturn }: { receipt: HdmReceipt; onC
   );
 }
 
-type ReturnRow = { receiptProductId: number; goodName: string; unit: string; price: number; left: number; unitValue: number; quantity: string };
+// A row sold with eMark codes is returned by ticking the codes given back.
+type ReturnRow = {
+  receiptProductId: number;
+  goodName: string;
+  unit: string;
+  price: number;
+  left: number;
+  unitValue: number;
+  quantity: string;
+  emarks: string[];
+  picked: string[];
+};
 
 function ReturnModal({ receipt, onClose, onDone }: { receipt: HdmReceipt; onClose: () => void; onDone: (r: HdmReceipt) => void }) {
   const [rows, setRows] = useState<ReturnRow[] | null>(null);
@@ -65,7 +77,7 @@ function ReturnModal({ receipt, onClose, onDone }: { receipt: HdmReceipt; onClos
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    authFetch<{ cash: number; card: number; items: { receiptProductId: number; goodName: string; unit: string; price: number; quantity: number; total: number }[] }>(
+    authFetch<{ cash: number; card: number; items: { receiptProductId: number; goodName: string; unit: string; price: number; quantity: number; total: number; emarks?: string[] }[] }>(
       `${API_BASE}/sales/ehdm/receipts/${receipt.id}/return-info`,
     )
       .then((info) => {
@@ -84,6 +96,8 @@ function ReturnModal({ receipt, onClose, onDone }: { receipt: HdmReceipt; onClos
               left: row.quantity,
               unitValue,
               quantity: "",
+              emarks: row.emarks ?? [],
+              picked: [],
             };
           }),
         );
@@ -106,7 +120,12 @@ function ReturnModal({ receipt, onClose, onDone }: { receipt: HdmReceipt; onClos
         body: JSON.stringify({
           cashAmount: paidByCard ? 0 : amount,
           cardAmount: paidByCard ? amount : 0,
-          items: chosen.map((r) => ({ receiptProductId: r.receiptProductId, quantity: num(r.quantity), goodName: r.goodName })),
+          items: chosen.map((r) => ({
+            receiptProductId: r.receiptProductId,
+            quantity: num(r.quantity),
+            goodName: r.goodName,
+            ...(r.emarks.length > 0 ? { emarks: r.picked } : {}),
+          })),
         }),
       });
       onDone(done);
@@ -133,13 +152,38 @@ function ReturnModal({ receipt, onClose, onDone }: { receipt: HdmReceipt; onClos
               </span>
               <input
                 value={r.quantity}
-                disabled={r.left <= 0}
+                disabled={r.left <= 0 || r.emarks.length > 0}
                 onChange={(e) => setRows((prev) => prev!.map((x, j) => (j === i ? { ...x, quantity: e.target.value } : x)))}
                 placeholder="0"
                 inputMode="decimal"
-                className={inputClass}
+                className={`${inputClass} disabled:bg-muted`}
                 aria-label={`Վերադարձվող քանակ՝ ${r.goodName}`}
               />
+              {r.emarks.length > 0 && (
+                <div className="col-span-2 space-y-1 rounded-md bg-muted/50 p-2">
+                  <p className="text-xs text-muted-foreground">Նշեք վերադարձվող EMark կոդերը</p>
+                  {r.emarks.map((code) => (
+                    <label key={code} className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={r.picked.includes(code)}
+                        onChange={(e) =>
+                          setRows((prev) =>
+                            prev!.map((x, j) => {
+                              if (j !== i) return x;
+                              const picked = e.target.checked ? [...x.picked, code] : x.picked.filter((c) => c !== code);
+                              return { ...x, picked, quantity: picked.length ? String(picked.length) : "" };
+                            }),
+                          )
+                        }
+                      />
+                      <span className="truncate font-mono" title={code}>
+                        {showEmark(code, 40)}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           <div className="flex flex-wrap gap-4 border-t pt-2">

@@ -31,6 +31,8 @@ const Line = ({ label, value, bold }: { label: string; value: string | number | 
 
 export default function HdmReceiptView({ receipt }: { receipt: HdmReceipt }) {
   const svg = useMemo(() => (receipt.qr ? qrSvg(receipt.qr) : null), [receipt.qr]);
+  // Printing other pages prints them whole again once the receipt is closed.
+  useEffect(() => () => document.body.classList.remove("hdm-printing"), []);
   const isReturn = receipt.type === "RETURN";
   const fake = receipt.mode === "mock" || receipt.mode === "test";
 
@@ -66,6 +68,7 @@ export default function HdmReceiptView({ receipt }: { receipt: HdmReceipt }) {
             ) : (
               <p>{item.quantity}</p>
             )}
+            {item.emarks && item.emarks.length > 0 && <p>EMark՝ {item.emarks.length}</p>}
           </div>
         );
       })}
@@ -84,14 +87,15 @@ export default function HdmReceiptView({ receipt }: { receipt: HdmReceipt }) {
  * Prints only the receipt (see .hdm-printing in globals.css).
  */
 export const printReceipt = () => {
+  // The class only changes the printed page, so it can stay until the next print.
   document.body.classList.add("hdm-printing");
-  const done = () => {
-    document.body.classList.remove("hdm-printing");
-    window.removeEventListener("afterprint", done);
-  };
-  window.addEventListener("afterprint", done);
+  // The Android app's WebView ignores window.print(); its bridge opens the system print dialog.
+  const android = (window as unknown as { FlexitAndroid?: { print?: () => void } }).FlexitAndroid;
+  if (android?.print) {
+    android.print();
+    return;
+  }
   window.print();
-  window.setTimeout(done, 1000);
 };
 
 export function useEscape(onClose: () => void) {

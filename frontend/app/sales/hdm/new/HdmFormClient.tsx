@@ -8,16 +8,18 @@ import AuthGuard from "../../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../../lib/auth";
 import { formatAmount } from "../../../reports/sales/salesData";
 import { cardClass } from "../../salesShared";
+import EmarkScanner, { showEmark } from "../EmarkScanner";
 import { hdmError, HdmMode, HdmReceipt, MODE_NOTICE, num, round2 } from "../hdmShared";
 
 // A new cash register receipt (e-ՀԴՄ): goods, payment, and the buyer's TIN
 // when the buyer is a company.
 
-type Row = { goodName: string; goodCode: string; adgCode: string; unit: string; quantity: string; price: string; discount: string };
+// emarks: the scanned eMark codes, one per unit; with codes the quantity is their count.
+type Row = { goodName: string; goodCode: string; adgCode: string; unit: string; quantity: string; price: string; discount: string; emarks: string[] };
 
 const inputClass =
   "w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
-const emptyRow = (): Row => ({ goodName: "", goodCode: "", adgCode: "", unit: "հատ", quantity: "1", price: "", discount: "" });
+const emptyRow = (): Row => ({ goodName: "", goodCode: "", adgCode: "", unit: "հատ", quantity: "1", price: "", discount: "", emarks: [] });
 const rowTotal = (r: Row) => round2(num(r.quantity) * num(r.price) * (1 - Math.min(num(r.discount), 99.99) / 100));
 const decimals = (s: string) => (String(s).replace(",", ".").split(".")[1] ?? "").length;
 
@@ -33,6 +35,7 @@ export function HdmFormView() {
   const [cardPart, setCardPart] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState<number | null>(null);
 
   useEffect(() => {
     authFetch<{ mode: HdmMode }>(`${API_BASE}/sales/ehdm`)
@@ -46,6 +49,8 @@ export function HdmFormView() {
   const change = round2(cash + card - total);
 
   const updateRow = (i: number, patch: Partial<Row>) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const setEmarks = (i: number, emarks: string[]) => updateRow(i, { emarks, quantity: String(Math.max(emarks.length, 1)) });
+  const takenElsewhere = (i: number) => new Set(rows.flatMap((r, j) => (j === i ? [] : r.emarks)));
 
   const problems: string[] = [];
   rows.forEach((r, i) => {
@@ -81,6 +86,7 @@ export function HdmFormView() {
             quantity: num(r.quantity),
             price: num(r.price),
             discount: num(r.discount) || null,
+            emarks: r.emarks.length > 0 ? r.emarks : null,
           })),
         }),
       });
@@ -129,7 +135,16 @@ export function HdmFormView() {
                 <input value={r.goodCode} onChange={(e) => updateRow(i, { goodCode: e.target.value.slice(0, 50) })} placeholder="Կոդ (ոչ պարտ.)" className={inputClass} aria-label="Ապրանքի կոդ" />
                 <input value={r.adgCode} onChange={(e) => updateRow(i, { adgCode: e.target.value.replace(/[^\d.]/g, "") })} placeholder="ԱՏԳ կոդ" inputMode="numeric" className={inputClass} aria-label="ԱՏԳ կոդ" />
                 <input value={r.unit} onChange={(e) => updateRow(i, { unit: e.target.value.slice(0, 50) })} placeholder="Միավոր" className={inputClass} aria-label="Միավոր" />
-                <input value={r.quantity} onChange={(e) => updateRow(i, { quantity: e.target.value })} placeholder="Քանակ" inputMode="decimal" className={inputClass} aria-label="Քանակ" />
+                <input
+                  value={r.quantity}
+                  onChange={(e) => updateRow(i, { quantity: e.target.value })}
+                  disabled={r.emarks.length > 0}
+                  title={r.emarks.length > 0 ? "Քանակը EMark կոդերի թիվն է" : undefined}
+                  placeholder="Քանակ"
+                  inputMode="decimal"
+                  className={`${inputClass} disabled:bg-muted`}
+                  aria-label="Քանակ"
+                />
                 <input value={r.price} onChange={(e) => updateRow(i, { price: e.target.value })} placeholder="Գին" inputMode="decimal" className={inputClass} aria-label="Գին" />
                 <input value={r.discount} onChange={(e) => updateRow(i, { discount: e.target.value })} placeholder="Զեղչ %" inputMode="decimal" className={inputClass} aria-label="Զեղչ %" />
                 <span className="self-center text-right text-sm font-semibold tabular-nums">
@@ -145,6 +160,23 @@ export function HdmFormView() {
                 >
                   ✕
                 </button>
+                <div className="col-span-2 flex flex-wrap items-center gap-2 lg:col-span-9">
+                  <button
+                    type="button"
+                    onClick={() => setScanning(i)}
+                    className={`rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-accent ${
+                      r.emarks.length > 0 ? "border-green-600 text-green-800" : "border-input"
+                    }`}
+                  >
+                    📷 {r.emarks.length > 0 ? `EMark · ${r.emarks.length}` : "Ավելացնել EMark"}
+                  </button>
+                  {r.emarks.slice(-2).map((code) => (
+                    <span key={code} className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground" title={code}>
+                      {showEmark(code)}
+                    </span>
+                  ))}
+                  {r.emarks.length > 2 && <span className="text-xs text-muted-foreground">+{r.emarks.length - 2}</span>}
+                </div>
               </div>
             ))}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
@@ -211,6 +243,15 @@ export function HdmFormView() {
           </div>
         </div>
       </main>
+      {scanning !== null && rows[scanning] && (
+        <EmarkScanner
+          title={rows[scanning].goodName || `տող ${scanning + 1}`}
+          codes={rows[scanning].emarks}
+          taken={takenElsewhere(scanning)}
+          onChange={(codes) => setEmarks(scanning, codes)}
+          onClose={() => setScanning(null)}
+        />
+      )}
     </div>
   );
 }
