@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatAmount } from "../../reports/sales/salesData";
-import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, hasSrcExtension, SrcSessionError, srcFetch, TYPE_LABELS } from "../salesShared";
+import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, hasSrcExtension, nativeBridge, SrcSessionError, srcFetch, TYPE_LABELS } from "../salesShared";
 
 // The form for a new account document (հաշիվ-վավերագիր): saved in e-invoicing
 // as a draft, and signed right away when the user has a signing method.
@@ -77,9 +77,11 @@ export function SalesFormView() {
         busy: false,
         error:
           err instanceof SrcSessionError
-            ? hasSrcExtension()
-              ? "Մուտք գործեք file-online.taxservice.am (այս նույն բրաուզերում), բացեք e-invoicing բաժինը և կրկին սեղմեք «Գտնել ՊԵԿ-ում»։"
-              : "ՊԵԿ-ի հետ սարքից աշխատելու համար տեղադրեք «Flexit ՊԵԿ կապ» Chrome ընդլայնումը։"
+            ? nativeBridge()
+              ? "ՊԵԿ-ը չընդունեց մուտքը. ստուգեք e-invoicing-ի login-ը և գաղտնաբառը ադմինկայում (DB entries)։"
+              : hasSrcExtension()
+                ? "Մուտք գործեք file-online.taxservice.am (այս նույն բրաուզերում), բացեք e-invoicing բաժինը և կրկին սեղմեք «Գտնել ՊԵԿ-ում»։"
+                : "ՊԵԿ-ի հետ աշխատելու համար բացեք տերմինալը Flexit ծրագրով (Windows կամ Android)։"
             : `ՊԵԿ-ի հետ կապ չստացվեց. ${(err as Error).message}`,
       });
     }

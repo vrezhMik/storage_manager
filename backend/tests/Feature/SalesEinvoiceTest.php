@@ -256,6 +256,15 @@ class SalesEinvoiceTest extends TestCase
             ->assertJsonPath('message', 'The tax service login (ews.taxservice.am) is not reachable from this server');
     }
 
+    public function test_device_login_gives_the_app_its_login_request(): void
+    {
+        $this->getJson('/api/sales/device-login', $this->headers($this->user()))
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertJsonPath('apiUrl', 'https://e-invoicing.taxservice.am/api')
+            ->assertJson(fn ($json) => $json->where('envelope', fn ($env) => str_contains($env, 'Tin="01234567"') && str_contains($env, 'Password="tax-pass"'))->etc());
+    }
+
     public function test_unknown_classifier_code_is_explained(): void
     {
         $this->fakeTaxService();

@@ -1,3 +1,5 @@
+import { API_BASE, authFetch } from "../lib/auth";
+
 // Shared by the documents list (/sales) and the form (/sales/new).
 
 export type DocType = "ACC_DOC_GOODS" | "ACC_DOC_SERVICES";
@@ -70,10 +72,64 @@ const viaExtension = (path: string, payload: Record<string, unknown>) =>
     window.postMessage({ type: "FLEXIT_SRC_REQUEST", id, path, payload }, window.location.origin);
   });
 
+// The Flexit desktop / mobile app (tools/desktop-app) gives the page
+// window.flexitNative.request(): the request is made by the device itself.
+type NativeRequest = (spec: {
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  timeoutMs?: number;
+}) => Promise<{ status: number; headers: Record<string, string>; body: string }>;
+
+export const nativeBridge = (): { platform: string; request: NativeRequest } | null =>
+  typeof window !== "undefined" ? ((window as unknown as { flexitNative?: { platform: string; request: NativeRequest } }).flexitNative ?? null) : null;
+
+// The tax service login, done from the device; the token is kept for 20 minutes.
+let deviceToken: { value: string; until: number; apiUrl: string } | null = null;
+
+const deviceLogin = async (fresh: boolean) => {
+  if (!fresh && deviceToken && deviceToken.until > Date.now()) return deviceToken;
+  const native = nativeBridge()!;
+  const login = await authFetch<{ url: string; apiUrl: string; envelope: string }>(`${API_BASE}/sales/device-login`);
+  const res = await native.request({
+    url: login.url,
+    method: "POST",
+    headers: { "Content-Type": "text/xml;charset=UTF-8" },
+    body: login.envelope,
+  });
+  const token = /<AuthToken>([^<]+)<\/AuthToken>/.exec(res.body)?.[1];
+  if (!token) {
+    const message = /Message="([^"]*)"/.exec(res.body)?.[1];
+    throw new Error(`Login to e-invoicing failed${message ? `: ${message}` : ` (HTTP ${res.status})`}`);
+  }
+  deviceToken = { value: token.trim(), until: Date.now() + 20 * 60 * 1000, apiUrl: login.apiUrl };
+  return deviceToken;
+};
+
+const viaNative = async (path: string, payload: Record<string, unknown>) => {
+  const native = nativeBridge()!;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const token = await deviceLogin(attempt > 0);
+    const res = await native.request({
+      url: `${token.apiUrl}/${path}`,
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", Cookie: `jwt-auth-token=${token.value}` },
+      body: JSON.stringify({ payload }),
+      timeoutMs: 60000,
+    });
+    if ((res.status === 401 || res.status === 403) && attempt === 0) continue;
+    return res;
+  }
+  throw new Error("E-invoicing rejected the login token");
+};
+
 export const srcFetch = async (path: string, payload: Record<string, unknown>): Promise<SrcAnswer> => {
   let status: number;
   let text: string;
-  if (hasSrcExtension()) {
+  if (nativeBridge()) {
+    ({ status, body: text } = await viaNative(path, payload));
+  } else if (hasSrcExtension()) {
     ({ status, body: text } = await viaExtension(path, payload));
   } else {
     const res = await fetch(`${SRC_API}/${path}`, {

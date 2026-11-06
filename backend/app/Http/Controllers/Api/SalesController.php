@@ -31,6 +31,24 @@ class SalesController extends Controller
     }
 
     /**
+     * For the Flexit apps: the e-invoicing login request they send from the
+     * device itself (the tax service only answers Armenian addresses).
+     */
+    public function deviceLogin(Request $request): JsonResponse
+    {
+        $client = $this->client($request);
+        if ($client instanceof JsonResponse) {
+            return $client;
+        }
+
+        return response()->json([
+            'url' => (string) config('services.einvoice.login_url', EinvoiceClient::LOGIN_URL),
+            'apiUrl' => EinvoiceClient::API_URL,
+            'envelope' => $client->loginEnvelope(),
+        ])->header('Cache-Control', 'no-store');
+    }
+
+    /**
      * ?tin=XXXXXXXX -> {tin, name, address} of the buyer from the tax service.
      */
     public function taxpayer(Request $request): JsonResponse

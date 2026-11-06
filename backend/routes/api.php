@@ -30,6 +30,7 @@ Route::middleware(['auth.jwt', 'section:retail'])->get('retail-plan', [OrderCont
 Route::middleware(['auth.jwt', 'section:retail'])->get('retail-suppliers', [OrderController::class, 'retailSuppliers']);
 Route::middleware(['auth.jwt', 'section:sales'])->prefix('sales')->group(function (): void {
     Route::get('taxpayer', [SalesController::class, 'taxpayer']);
+    Route::get('device-login', [SalesController::class, 'deviceLogin']);
     Route::get('documents', [SalesController::class, 'documents']);
     Route::post('documents', [SalesController::class, 'store']);
     Route::post('documents/{document}/sign', [SalesController::class, 'sign']);

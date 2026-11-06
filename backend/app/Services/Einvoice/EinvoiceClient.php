@@ -38,6 +38,23 @@ class EinvoiceClient
         return new self($entry);
     }
 
+    /**
+     * The SOAP login request for the company's account. The Flexit desktop and
+     * mobile apps send it themselves, so the tax service sees the device's IP.
+     */
+    public function loginEnvelope(): string
+    {
+        $esc = fn (string $value) => htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+
+        return '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:def="http://www.taxservice.am/tp3/invoice/definitions">'
+            .'<soapenv:Header/><soapenv:Body>'
+            .'<def:LoginWebRequest Tin="'.$esc((string) $this->entry->einvoice_tin).'"'
+            .' Login="'.$esc((string) $this->entry->einvoice_login).'"'
+            .' Password="'.$esc((string) $this->entry->einvoice_password).'"'
+            .' ClientType="API" ClientDescription="Flexit terminal"/>'
+            .'</soapenv:Body></soapenv:Envelope>';
+    }
+
     public function token(bool $fresh = false): string
     {
         $key = 'einvoice-token:'.$this->entry->id.':'.md5($this->entry->einvoice_tin.'|'.$this->entry->einvoice_login.'|'.$this->entry->einvoice_password);
@@ -47,14 +64,7 @@ class EinvoiceClient
         }
 
         return Cache::remember($key, now()->addMinutes(20), function (): string {
-            $esc = fn (string $value) => htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
-            $body = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:def="http://www.taxservice.am/tp3/invoice/definitions">'
-                .'<soapenv:Header/><soapenv:Body>'
-                .'<def:LoginWebRequest Tin="'.$esc((string) $this->entry->einvoice_tin).'"'
-                .' Login="'.$esc((string) $this->entry->einvoice_login).'"'
-                .' Password="'.$esc((string) $this->entry->einvoice_password).'"'
-                .' ClientType="API" ClientDescription="Flexit terminal"/>'
-                .'</soapenv:Body></soapenv:Envelope>';
+            $body = $this->loginEnvelope();
 
             // The login service may only answer Armenian addresses: services.einvoice.login_url
             // can point to a relay in Armenia that forwards to the same service.
