@@ -18,6 +18,7 @@ function titleForPath(pathname: string) {
   if (pathname.startsWith("/reports/sales-by-warehouse")) return "Վաճառք ըստ պահեստների";
   if (pathname.startsWith("/reports/sales")) return "Վաճառք ըստ մենեջերների";
   if (pathname.startsWith("/reports")) return "Հաշվետվություններ";
+  if (pathname.startsWith("/sales/hdm")) return "ՀԴՄ կտրոններ";
   if (pathname.startsWith("/price-check")) return "Գնի հարցում";
   if (pathname.startsWith("/dashboard")) return "Flexit Դաշբորդ";
   if (pathname.startsWith("/assistant")) return "Flexik օգնական";

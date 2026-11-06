@@ -49,6 +49,17 @@ return [
         'login_url' => env('EINVOICE_LOGIN_URL', 'https://ews.taxservice.am/taxsystem-fe-ws/taxpayer/loginService'),
     ],
 
+    // The tax service's electronic cash register (e-ՀԴՄ) web service. It only
+    // accepts the IP registered for the register, with its client certificate.
+    // The test system is on the tax service's internal network.
+    'ehdm' => [
+        'live_url' => env('EHDM_LIVE_URL', 'https://ecrm.taxservice.am/taxsystem-rs-vcr'),
+        'test_url' => env('EHDM_TEST_URL', 'https://10.3.14.123:447'),
+        // The tax service's CA root (ca_645b34a4865e7.crt) as a file path; empty = system CAs.
+        'ca_file' => env('EHDM_CA_FILE', ''),
+        'test_verify' => (bool) env('EHDM_TEST_VERIFY', false),
+    ],
+
     // Local translator for the assistant (tools/translator). Empty URL = off.
     'translator' => [
         'url' => env('TRANSLATOR_URL', ''),

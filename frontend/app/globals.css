@@ -263,3 +263,19 @@ html[dir="ltr"] {
   --lift: 1;
   --lift-amount: calc(1 * var(--gap));
 }
+
+/* ՀԴՄ կտրոն: print only the receipt (HdmReceiptView / printReceipt). */
+@media print {
+  body.hdm-printing * {
+    visibility: hidden;
+  }
+  body.hdm-printing .hdm-receipt,
+  body.hdm-printing .hdm-receipt * {
+    visibility: visible;
+  }
+  body.hdm-printing .hdm-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+}

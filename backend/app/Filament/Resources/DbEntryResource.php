@@ -4,9 +4,14 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DbEntryResource\Pages;
 use App\Models\DbEntry;
+use App\Models\EhdmReceipt;
+use App\Services\Ehdm\EhdmClient;
+use App\Services\Ehdm\EhdmException;
+use App\Services\Ehdm\EhdmMock;
 use BackedEnum;
 use Filament\Actions;
 use Filament\Forms;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -114,7 +119,59 @@ class DbEntryResource extends Resource
                 ->helperText('Stored encrypted. Leave empty to keep the current password.')
                 ->dehydrated(fn ($state) => filled($state))
                 ->maxLength(255),
+            Forms\Components\Select::make('ehdm_mode')
+                ->label('e-ՀԴՄ: mode')
+                ->options([
+                    'off' => 'Off',
+                    'mock' => 'Mock (simulated, nothing is sent to the tax service)',
+                    'test' => 'Test (tax service test system)',
+                    'live' => 'Live (real receipts)',
+                ])
+                ->default('off')
+                ->required()
+                ->helperText('The tax service accepts e-ՀԴՄ requests only from the IP given in the u6 application, with its certificate.'),
+            Forms\Components\TextInput::make('ehdm_crn')
+                ->label('e-ՀԴՄ: register number (CRN)')
+                ->helperText('«ՀԴՄ գրանցման համար» on file-online → ՀԴՄ-ների ցանկ')
+                ->maxLength(32),
+            Forms\Components\TextInput::make('ehdm_dep')
+                ->label('e-ՀԴՄ: department (բաժին)')
+                ->helperText('Department number used on receipts (created with «e-ՀԴՄ: departments»).')
+                ->numeric()
+                ->minValue(1)
+                ->default(1),
+            Forms\Components\Textarea::make('ehdm_cert')
+                ->label('e-ՀԴՄ: certificate and key (PEM)')
+                ->helperText('From the .jks: keytool -importkeystore -srckeystore zzz.jks -destkeystore zzz.p12 -deststoretype PKCS12, then openssl pkcs12 -in zzz.p12 -nodes -out zzz.pem; paste zzz.pem. Stored encrypted. Leave empty to keep the current one.')
+                ->rows(4)
+                ->dehydrated(fn ($state) => filled($state)),
+            Forms\Components\TextInput::make('ehdm_cert_password')
+                ->label('e-ՀԴՄ: key password')
+                ->password()
+                ->helperText('Only if the PEM key is encrypted. Stored encrypted.')
+                ->dehydrated(fn ($state) => filled($state))
+                ->maxLength(255),
         ]);
+    }
+
+    /**
+     * Runs one e-ՀԴՄ setup call and shows the answer.
+     */
+    private static function ehdmAction(string $name, string $label, callable $run): Actions\Action
+    {
+        return Actions\Action::make($name)
+            ->label($label)
+            ->icon('heroicon-o-receipt-percent')
+            ->visible(fn (DbEntry $record) => $record->hasEhdm())
+            ->requiresConfirmation()
+            ->action(function (DbEntry $record) use ($run): void {
+                try {
+                    $answer = $run(EhdmClient::for($record), $record);
+                    Notification::make()->title($label)->body((string) $answer)->success()->send();
+                } catch (EhdmException $e) {
+                    Notification::make()->title($label)->body($e->getMessage())->danger()->persistent()->send();
+                }
+            });
     }
 
     public static function table(Table $table): Table
@@ -193,6 +250,22 @@ class DbEntryResource extends Resource
             ])
             ->actions([
                 Actions\EditAction::make(),
+                Actions\ActionGroup::make([
+                    self::ehdmAction('ehdmCheck', 'e-ՀԴՄ: check connection', fn (EhdmClient $c) => $c->checkConnection()),
+                    self::ehdmAction('ehdmActivate', 'e-ՀԴՄ: activate', fn (EhdmClient $c) => $c->activate()),
+                    self::ehdmAction('ehdmDepartments', 'e-ՀԴՄ: departments', fn (EhdmClient $c, DbEntry $r) => $c->configureDepartments([(int) $r->ehdm_dep => 1]))
+                        ->modalDescription(fn (DbEntry $record) => 'Sends department '.$record->ehdm_dep.' with tax regime 1 (ԱԱՀ-ով հարկվող) to the tax service.'),
+                    Actions\Action::make('ehdmMockReset')
+                        ->label('e-ՀԴՄ: clear mock receipts')
+                        ->icon('heroicon-o-trash')
+                        ->visible(fn (DbEntry $record) => $record->ehdm_mode === 'mock')
+                        ->requiresConfirmation()
+                        ->action(function (DbEntry $record): void {
+                            EhdmMock::forget($record);
+                            EhdmReceipt::query()->where('db_entry_id', $record->id)->where('mode', 'mock')->delete();
+                            Notification::make()->title('Mock receipts cleared')->success()->send();
+                        }),
+                ])->label('e-ՀԴՄ')->icon('heroicon-o-receipt-percent'),
             ])
             ->bulkActions([
                 Actions\DeleteBulkAction::make(),

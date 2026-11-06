@@ -31,22 +31,46 @@ class DbEntry extends Model
         'einvoice_tin',
         'einvoice_login',
         'einvoice_password',
+        'ehdm_mode',
+        'ehdm_crn',
+        'ehdm_dep',
+        'ehdm_cert',
+        'ehdm_cert_password',
     ];
 
     // The e-invoicing password never leaves the server.
     protected $hidden = [
         'einvoice_password',
+        'ehdm_cert',
+        'ehdm_cert_password',
     ];
 
     protected function casts(): array
     {
         return [
             'einvoice_password' => 'encrypted',
+            'ehdm_cert' => 'encrypted',
+            'ehdm_cert_password' => 'encrypted',
+            'ehdm_dep' => 'integer',
+            'ehdm_seq' => 'integer',
         ];
     }
 
     public function hasEinvoiceAccount(): bool
     {
         return filled($this->einvoice_tin) && filled($this->einvoice_login) && filled($this->einvoice_password);
+    }
+
+    /**
+     * The electronic cash register can print: "mock" needs only the mode;
+     * "test" and "live" need the register number and the certificate.
+     */
+    public function hasEhdm(): bool
+    {
+        return match ($this->ehdm_mode) {
+            'mock' => true,
+            'test', 'live' => filled($this->ehdm_crn) && filled($this->ehdm_cert),
+            default => false,
+        };
     }
 }

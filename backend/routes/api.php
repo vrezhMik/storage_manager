@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\EhdmController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SalesController;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,12 @@ Route::middleware(['auth.jwt', 'section:sales'])->prefix('sales')->group(functio
     Route::get('documents/{document}/sign-status', [SalesController::class, 'signStatus']);
     Route::get('sign-info', [SalesController::class, 'signInfo']);
     Route::post('documents/{document}/device-sign', [SalesController::class, 'deviceSign']);
+    Route::get('ehdm', [EhdmController::class, 'index']);
+    Route::post('ehdm/receipts', [EhdmController::class, 'store']);
+    Route::get('ehdm/receipts/{receipt}', [EhdmController::class, 'show']);
+    Route::post('ehdm/receipts/{receipt}/copy', [EhdmController::class, 'copy']);
+    Route::get('ehdm/receipts/{receipt}/return-info', [EhdmController::class, 'returnInfo']);
+    Route::post('ehdm/receipts/{receipt}/return', [EhdmController::class, 'storeReturn']);
 });
 Route::middleware(['auth.jwt', 'section:assistant'])->post('assistant/search', [AssistantController::class, 'search']);
 Route::middleware(['auth.jwt', 'section:assistant'])->post('assistant/intent', [AssistantController::class, 'intent']);

@@ -41,6 +41,7 @@ class User extends Authenticatable implements FilamentUser
         'cosign_password',
         'mobile_id_phone',
         'nikita_phone',
+        'ehdm_cashier_id',
     ];
 
     /**

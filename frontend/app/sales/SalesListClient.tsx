@@ -20,6 +20,7 @@ import {
   nativeBridge,
 } from "./salesShared";
 import { checkSigningOnDevice, startSigningOnDevice } from "./einvoiceDevice";
+import SalesTabs from "./SalesTabs";
 
 const POLL_MS = 3000;
 
@@ -122,6 +123,7 @@ export function SalesListView() {
     <div className="App">
       <main className="container mx-auto px-4 py-6 pb-20">
         <div className="space-y-4">
+          <SalesTabs active="docs" />
           <div className={`${cardClass} flex flex-wrap items-center justify-between gap-3`}>
             <div>
               <h2 className="text-xl font-semibold text-foreground">Վաճառքներ</h2>

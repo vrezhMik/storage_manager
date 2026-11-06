@@ -99,6 +99,11 @@ class UserResource extends Resource
                         ->helperText('Phone with the Nikita app, e.g. 37491123456. The user confirms in the app.')
                         ->tel()
                         ->maxLength(20),
+                    Forms\Components\TextInput::make('ehdm_cashier_id')
+                        ->label('e-ՀԴՄ cashier number (Գանձապահ)')
+                        ->helperText('Printed on this user\'s receipts. Empty = 1.')
+                        ->numeric()
+                        ->minValue(1),
                     Forms\Components\TextInput::make('retail_store')
                         ->label('Retail store (Խանութ)')
                         ->helperText('Store (warehouse) name exactly as in 1C. The user sees only this store. Empty = all stores.')
