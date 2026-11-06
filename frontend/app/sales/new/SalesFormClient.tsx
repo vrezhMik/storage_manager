@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatAmount } from "../../reports/sales/salesData";
-import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, TYPE_LABELS } from "../salesShared";
+import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, SrcSessionError, srcFetch, TYPE_LABELS } from "../salesShared";
 
 // The form for a new account document (հաշիվ-վավերագիր): saved in e-invoicing
 // as a draft, and signed right away when the user has a signing method.
@@ -60,13 +60,26 @@ export function SalesFormView() {
       return;
     }
     setLookup({ busy: true, error: null });
+    // Asked from this device (its own IP), with the e-invoicing session the
+    // employee opened on file-online.taxservice.am.
     try {
-      const res = await authFetch<{ name?: string; address?: string }>(`${API_BASE}/sales/taxpayer?tin=${buyerTin}`);
-      setBuyerName(res?.name ?? "");
-      setBuyerAddress(res?.address ?? "");
+      const answer = await srcFetch("tpinfo/tp-info-by-tin", { tin: buyerTin, checkDate: new Date().toISOString() });
+      const info = (answer.payload ?? null) as Record<string, unknown> | null;
+      if (!answer.ok || !info) {
+        setLookup({ busy: false, error: answer.failure?.message ?? "Այս ՀՎՀՀ-ով հարկ վճարող չգտնվեց" });
+        return;
+      }
+      setBuyerName(String(info.name ?? info.taxpayerName ?? ""));
+      setBuyerAddress(String(info.address ?? info.legalAddress ?? ""));
       setLookup({ busy: false, error: null });
     } catch (err) {
-      setLookup({ busy: false, error: errorText(err) });
+      setLookup({
+        busy: false,
+        error:
+          err instanceof SrcSessionError
+            ? "Մուտք գործեք file-online.taxservice.am (այս նույն բրաուզերում) և կրկին սեղմեք «Գտնել ՊԵԿ-ում»։"
+            : `ՊԵԿ-ի հետ կապ չստացվեց. ${(err as Error).message}`,
+      });
     }
   };
 
