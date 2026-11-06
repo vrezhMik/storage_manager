@@ -52,10 +52,46 @@ const capacitorBridge = (): { platform: string; request: NativeRequest } | null 
   };
 };
 
+// Android app: window.FlexitAndroid.request(id, specJson) (FlexitBridge.java)
+// answers through window.__flexitAndroidDone(id, resultJson).
+type AndroidGlobal = {
+  FlexitAndroid?: { request: (id: string, spec: string) => void };
+  __flexitAndroidDone?: (id: string, result: string) => void;
+};
+const pendingAndroid = new Map<string, { resolve: (v: { status: number; headers: Record<string, string>; body: string }) => void; reject: (e: Error) => void }>();
+
+const androidBridge = (): { platform: string; request: NativeRequest } | null => {
+  const w = window as unknown as AndroidGlobal;
+  if (!w.FlexitAndroid?.request) return null;
+  if (!w.__flexitAndroidDone) {
+    w.__flexitAndroidDone = (id, result) => {
+      const pending = pendingAndroid.get(id);
+      if (!pending) return;
+      pendingAndroid.delete(id);
+      try {
+        const parsed = JSON.parse(result);
+        if (parsed.error) pending.reject(new Error(parsed.error));
+        else pending.resolve({ status: parsed.status, headers: parsed.headers ?? {}, body: parsed.body ?? "" });
+      } catch {
+        pending.reject(new Error("Bad answer from the app"));
+      }
+    };
+  }
+  return {
+    platform: "android",
+    request: (spec) =>
+      new Promise((resolve, reject) => {
+        const id = `${Date.now()}-${Math.random()}`;
+        pendingAndroid.set(id, { resolve, reject });
+        w.FlexitAndroid!.request(id, JSON.stringify(spec));
+      }),
+  };
+};
+
 export const nativeBridge = (): { platform: string; request: NativeRequest } | null => {
   if (typeof window === "undefined") return null;
   const desktop = (window as unknown as { flexitNative?: { platform: string; request: NativeRequest } }).flexitNative;
-  return desktop ?? capacitorBridge();
+  return desktop ?? androidBridge() ?? capacitorBridge();
 };
 
 /**
