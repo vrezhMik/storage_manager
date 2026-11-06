@@ -243,6 +243,93 @@ class EhdmTest extends TestCase
         $this->getJson("/api/sales/ehdm/receipts/{$id}", $this->headers($user))->assertNotFound();
     }
 
+    private function codes(int $count, string $prefix = 'A'): array
+    {
+        return array_map(fn (int $i) => "0104859996301235{$prefix}21x".str_pad((string) $i, 12, '0', STR_PAD_LEFT)."\u{1d}93YnNN", range(1, $count));
+    }
+
+    public function test_emark_codes_go_with_the_receipt_and_come_back_with_a_return(): void
+    {
+        $user = $this->user();
+        [$a, $b, $c] = $this->codes(3);
+        $sale = [
+            'items' => [
+                ['goodName' => 'Սիգարետ', 'adgCode' => '2402', 'unit' => 'տուփ', 'quantity' => 3, 'price' => 1000, 'emarks' => [$a, $b, $c]],
+                ['goodName' => 'Լուցկի', 'adgCode' => '3605', 'unit' => 'հատ', 'quantity' => 1, 'price' => 50],
+            ],
+        ];
+
+        $id = $this->postJson('/api/sales/ehdm/receipts', $sale, $this->headers($user))
+            ->assertCreated()
+            ->assertJsonPath('items.0.emarks', [$a, $b, $c])
+            ->json('id');
+
+        // The same codes cannot be sold twice.
+        $this->postJson('/api/sales/ehdm/receipts', $sale, $this->headers($user))
+            ->assertStatus(422)
+            ->assertJsonPath('code', 207);
+
+        $this->getJson("/api/sales/ehdm/receipts/{$id}/return-info", $this->headers($user))
+            ->assertJsonPath('items.0.emarks', [$a, $b, $c])
+            ->assertJsonPath('items.1.emarks', []);
+
+        // A coded row is returned by naming its codes.
+        $this->postJson("/api/sales/ehdm/receipts/{$id}/return", [
+            'cashAmount' => 1000,
+            'items' => [['receiptProductId' => 0, 'quantity' => 1]],
+        ], $this->headers($user))->assertStatus(422);
+
+        $this->postJson("/api/sales/ehdm/receipts/{$id}/return", [
+            'cashAmount' => 1000,
+            'items' => [['receiptProductId' => 0, 'quantity' => 1, 'emarks' => [$b]]],
+        ], $this->headers($user))
+            ->assertCreated()
+            ->assertJsonPath('items.0.emarks', [$b]);
+
+        $this->getJson("/api/sales/ehdm/receipts/{$id}/return-info", $this->headers($user))
+            ->assertJsonPath('items.0.emarks', [$a, $c])
+            ->assertJsonPath('items.0.quantity', 2);
+
+        // A code already given back cannot be returned again.
+        $this->postJson("/api/sales/ehdm/receipts/{$id}/return", [
+            'cashAmount' => 1000,
+            'items' => [['receiptProductId' => 0, 'quantity' => 1, 'emarks' => [$b]]],
+        ], $this->headers($user))->assertStatus(422);
+    }
+
+    public function test_emark_codes_must_match_the_quantity_and_the_length(): void
+    {
+        $user = $this->user();
+        $row = ['goodName' => 'Գինի', 'adgCode' => '2204', 'unit' => 'շիշ', 'price' => 5000];
+
+        $this->postJson('/api/sales/ehdm/receipts', ['items' => [$row + ['quantity' => 2, 'emarks' => $this->codes(1)]]], $this->headers($user))
+            ->assertStatus(422)
+            ->assertJsonPath('message', fn ($m) => str_contains($m, 'eMark'));
+
+        $this->postJson('/api/sales/ehdm/receipts', ['items' => [$row + ['quantity' => 1, 'emarks' => ['too-short-code']]]], $this->headers($user))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('items.0.emarks.0');
+
+        [$code] = $this->codes(1);
+        $this->postJson('/api/sales/ehdm/receipts', ['items' => [$row + ['quantity' => 1, 'emarks' => [$code]], $row + ['quantity' => 1, 'emarks' => [$code]]]], $this->headers($user))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('items.0.emarks.0');
+    }
+
+    public function test_emark_codes_are_sent_once_for_the_whole_receipt(): void
+    {
+        $user = $this->user('live');
+        Http::fake(['*' => Http::response(['code' => 0, 'message' => 'OK', 'result' => ['receiptId' => '1', 'total' => 3000.0, 'time' => 1721140445000]])]);
+        $codes = $this->codes(3);
+
+        $this->postJson('/api/sales/ehdm/receipts', ['items' => [
+            ['goodName' => 'Սիգարետ', 'adgCode' => '2402', 'unit' => 'տուփ', 'quantity' => 2, 'price' => 1000, 'emarks' => [$codes[0], $codes[1]]],
+            ['goodName' => 'Սիգար', 'adgCode' => '2402', 'unit' => 'հատ', 'quantity' => 1, 'price' => 1000, 'emarks' => [$codes[2]]],
+        ]], $this->headers($user))->assertCreated();
+
+        Http::assertSent(fn (Request $r) => $r['emarks'] === $codes && ! isset($r['items'][0]['emarks']));
+    }
+
     public function test_setup_calls_work_in_mock_mode(): void
     {
         $client = EhdmClient::for($this->user()->dbEntry);

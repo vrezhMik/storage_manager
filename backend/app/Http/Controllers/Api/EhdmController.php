@@ -129,7 +129,18 @@ class EhdmController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'decimal:0,3'],
             'items.*.price' => ['required', 'numeric', 'gt:0', 'decimal:0,2'],
             'items.*.discount' => ['nullable', 'numeric', 'min:0', 'lt:100'],
+            // eMark codes (դրոշմավորման կոդեր) scanned for the row, one per unit.
+            'items.*.emarks' => ['nullable', 'array', 'max:1000'],
+            'items.*.emarks.*' => ['string', 'min:29', 'max:128', 'distinct'],
         ]);
+
+        foreach ($data['items'] as $i => $item) {
+            $codes = $item['emarks'] ?? [];
+            if ($codes !== [] && (float) $item['quantity'] !== (float) count($codes)) {
+                return response()->json(['message' => 'The quantity must equal the number of eMark codes (row '.($i + 1).')'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+        $emarks = array_merge(...array_map(fn (array $item) => array_values($item['emarks'] ?? []), $data['items']));
 
         $client = $this->client($request);
         if ($client instanceof JsonResponse) {
@@ -156,6 +167,8 @@ class EhdmController extends Controller
         }, $data['items']);
 
         $total = EhdmMath::total($items);
+        // Kept with the rows, so a return can name the codes it gives back.
+        $stored = array_map(fn (array $row, array $item) => $row + (empty($item['emarks']) ? [] : ['emarks' => array_values($item['emarks'])]), $items, $data['items']);
         $cash = (float) ($data['cashAmount'] ?? 0);
         $card = (float) ($data['cardAmount'] ?? 0);
         if ($cash == 0.0 && $card == 0.0) {
@@ -172,11 +185,11 @@ class EhdmController extends Controller
             'cash_amount' => $cash,
             'card_amount' => $card,
             'total' => $total,
-            'items' => $items,
+            'items' => $stored,
         ]);
 
         try {
-            $result = $client->printReceipt($items, $cash, $card, $data['partnerTin'] ?? null, (int) ($request->user()->ehdm_cashier_id ?: 1));
+            $result = $client->printReceipt($items, $cash, $card, $data['partnerTin'] ?? null, (int) ($request->user()->ehdm_cashier_id ?: 1), $emarks);
         } catch (EhdmException $e) {
             $receipt->fill(['status' => EhdmReceipt::STATUS_FAILED, 'error' => $e->getMessage()])->save();
 
@@ -248,8 +261,10 @@ class EhdmController extends Controller
             return $client;
         }
 
+        $left = $this->emarksLeft($receipt);
+
         try {
-            $info = $client->returnedReceiptInfo($receipt->receipt_id);
+            $info = $client->returnedReceiptInfo($receipt->receipt_id, $receipt->crn);
         } catch (EhdmException $e) {
             return $this->failure($e);
         }
@@ -266,8 +281,30 @@ class EhdmController extends Controller
                 'price' => (float) ($row['price'] ?? 0),
                 'quantity' => (float) ($row['quantity'] ?? 0),
                 'total' => (float) ($row['totalWithTaxes'] ?? 0),
+                'emarks' => $left[(int) $row['receiptProductId']] ?? [],
             ], (array) ($info['items'] ?? [])),
         ]);
+    }
+
+    /**
+     * The eMark codes of each row of a sale receipt that were not returned yet.
+     *
+     * @return array<int, string[]> receiptProductId (the row's index) => codes
+     */
+    private function emarksLeft(EhdmReceipt $receipt): array
+    {
+        $returned = $receipt->returns()->where('status', EhdmReceipt::STATUS_OK)->get()
+            ->flatMap(fn (EhdmReceipt $r) => collect($r->items)->flatMap(fn (array $item) => $item['emarks'] ?? []))
+            ->flip();
+
+        $left = [];
+        foreach ((array) $receipt->items as $i => $item) {
+            if (! empty($item['emarks'])) {
+                $left[$i] = array_values(array_filter($item['emarks'], fn (string $code) => ! $returned->has($code)));
+            }
+        }
+
+        return $left;
     }
 
     /**
@@ -283,10 +320,26 @@ class EhdmController extends Controller
             'items.*.receiptProductId' => ['required', 'integer', 'min:0'],
             'items.*.quantity' => ['required', 'numeric', 'gt:0', 'decimal:0,3'],
             'items.*.goodName' => ['nullable', 'string', 'max:50'],
+            'items.*.emarks' => ['nullable', 'array'],
+            'items.*.emarks.*' => ['string', 'distinct'],
         ]);
         if ($receipt->type !== EhdmReceipt::TYPE_SALE || $receipt->status !== EhdmReceipt::STATUS_OK) {
             return response()->json(['message' => 'Only a printed sale receipt can be returned'], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
+
+        // A row sold with eMark codes is returned by naming the codes given back.
+        $left = $this->emarksLeft($receipt);
+        foreach ($data['items'] as $item) {
+            $codes = array_values($item['emarks'] ?? []);
+            $row = (int) $item['receiptProductId'];
+            if (! isset($left[$row]) && $codes === []) {
+                continue;
+            }
+            if (array_diff($codes, $left[$row] ?? []) !== [] || (float) $item['quantity'] !== (float) count($codes)) {
+                return response()->json(['message' => 'Choose the returned eMark codes of the row (one per unit)'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+        }
+        $emarks = array_merge(...array_map(fn (array $item) => array_values($item['emarks'] ?? []), $data['items']));
 
         $client = $this->client($request);
         if ($client instanceof JsonResponse) {
@@ -315,11 +368,11 @@ class EhdmController extends Controller
                 'receiptProductId' => (int) $item['receiptProductId'],
                 'goodName' => $item['goodName'] ?? null,
                 'quantity' => round((float) $item['quantity'], 3),
-            ], $data['items']),
+            ] + (empty($item['emarks']) ? [] : ['emarks' => array_values($item['emarks'])]), $data['items']),
         ]);
 
         try {
-            $result = $client->printReturn($receipt->receipt_id, $lines, $cash, $card);
+            $result = $client->printReturn($receipt->receipt_id, $lines, $cash, $card, $emarks, $receipt->crn);
         } catch (EhdmException $e) {
             $return->fill(['status' => EhdmReceipt::STATUS_FAILED, 'error' => $e->getMessage()])->save();
 

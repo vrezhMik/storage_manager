@@ -6,7 +6,7 @@ use App\Models\DbEntry;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Answers like the tax service's e-ՀԴՄ web service (manual of 12.2024), for
+ * Answers like the tax service's e-ՀԴՄ web service (manual of 02.2025), for
  * trying the terminal before the register is registered. Nothing leaves the
  * server; receipts are kept in the cache under the register number.
  */
@@ -34,6 +34,9 @@ class EhdmMock
         182 => ['RETURN_RECEIPT_IS_RETURN_TYPE', 'Վերադարձի կտրոնը հնարավոր չէ վերադարձնել'],
         183 => ['INVALID_ADG_CODE', 'Սխալ ԱՏԳ կոդ'],
         195 => ['CRM_ACTIVATION_FAILED', 'Էլեկտրոնային ՀԴՄ ակտիվացումը ձախողվել է'],
+        203 => ['SOURCE_CRN_NOT_EXIST', 'sourceCrn-ը գոյություն չունի'],
+        206 => ['NO_EMARK_CODES_NEEDED_IN_CASE_OF_PREPAYMENT', 'Կանխավճարի դեպքում չպետք է ուղարկվեն emark կոդեր'],
+        207 => ['WRONG_EMARK_CODE_FORMAT', 'Առկա է սխալ ձևաչափի emark կոդ'],
     ];
 
     private string $key;
@@ -63,7 +66,7 @@ class EhdmMock
     public function handle(string $method, array $body): array
     {
         return Cache::lock($this->key.':lock', 10)->block(5, function () use ($method, $body): array {
-            $this->state = Cache::get($this->key, ['seq' => null, 'active' => false, 'departments' => [], 'next' => 1, 'receipts' => []]);
+            $this->state = Cache::get($this->key, ['seq' => null, 'active' => false, 'departments' => [], 'next' => 1, 'receipts' => [], 'emarks' => []]);
 
             $answer = $this->dispatch($method, $body);
             Cache::forever($this->key, $this->state);
@@ -76,6 +79,10 @@ class EhdmMock
     {
         if (($body['crn'] ?? null) !== $this->crn()) {
             return $this->error(103);
+        }
+        // Returns name the register the receipt came from; the mock has one.
+        if (isset($body['sourceCrn']) && $body['sourceCrn'] !== $this->crn()) {
+            return $this->error(203, 'sourceCrn ('.$body['sourceCrn'].') գոյություն չունի');
         }
 
         if (in_array($method, ['configureDepartments', 'print', 'printCopy', 'getReturnedReceiptInfo', 'printReturnReceipt'], true)) {
@@ -185,6 +192,16 @@ class EhdmMock
             return $this->error(152);
         }
 
+        $emarks = $body['emarks'] ?? [];
+        if ($problem = $this->badEmarks($emarks)) {
+            return $problem;
+        }
+        foreach ($emarks as $code) {
+            if (isset($this->state['emarks'][$code])) {
+                return $this->error(207, 'eMark կոդն արդեն վաճառված է (կտրոն N '.$this->state['emarks'][$code].')');
+            }
+        }
+
         $receipt = [
             'receiptId' => (string) $this->state['next']++,
             'type' => 'SALE',
@@ -199,10 +216,34 @@ class EhdmMock
             'time' => (int) floor(microtime(true) * 1000),
             'fiscal' => (string) random_int(10000000, 99999999),
             'items' => $rows,
+            'emarks' => array_values($emarks),
         ];
         $this->state['receipts'][$receipt['receiptId']] = $receipt;
+        foreach ($emarks as $code) {
+            $this->state['emarks'][$code] = $receipt['receiptId'];
+        }
 
         return $this->ok($this->result($receipt));
+    }
+
+    /**
+     * eMark codes: a list of distinct strings of 29..128 characters.
+     */
+    private function badEmarks(mixed $emarks): ?array
+    {
+        if (! is_array($emarks)) {
+            return $this->error(105, 'emarks դաշտը պետք է լինի ցուցակ');
+        }
+        foreach ($emarks as $code) {
+            if (! is_string($code) || mb_strlen($code) < 29 || mb_strlen($code) > 128) {
+                return $this->error(207);
+            }
+        }
+        if (count(array_unique($emarks)) !== count($emarks)) {
+            return $this->error(207, 'Նույն eMark կոդը կրկնվում է');
+        }
+
+        return null;
     }
 
     private function badItem(mixed $item): ?array
@@ -310,6 +351,11 @@ class EhdmMock
                 'totalWithoutTaxes' => $row['taxRegime'] === 1 ? EhdmMath::money($row['total'] / 1.2) : (float) $row['total'],
                 'totalWithTaxes' => (float) $row['total'],
             ], $receipt['items']),
+            // The receipt's eMark codes not returned yet.
+            'emarks' => array_values(array_filter(
+                $receipt['emarks'] ?? [],
+                fn (string $code) => ($this->state['emarks'][$code] ?? null) === $receipt['receiptId'],
+            )),
         ]);
     }
 
@@ -354,8 +400,22 @@ class EhdmMock
             return $this->error(178, 'Վերադարձվող գումարը պետք է լինի '.number_format($amount, 2, '.', ''));
         }
 
+        // Returned eMark codes must have been sold with this receipt.
+        $emarks = $body['emarks'] ?? [];
+        if ($problem = $this->badEmarks($emarks)) {
+            return $problem;
+        }
+        foreach ($emarks as $code) {
+            if (($this->state['emarks'][$code] ?? null) !== $receipt['receiptId']) {
+                return $this->error(207, 'eMark կոդը չի վաճառվել այս կտրոնով կամ արդեն վերադարձված է');
+            }
+        }
+
         foreach ($list as $line) {
             $this->state['receipts'][$receipt['receiptId']]['items'][$line['receiptProductId']]['returned'] += (float) $line['quantity'];
+        }
+        foreach ($emarks as $code) {
+            unset($this->state['emarks'][$code]);
         }
 
         $return = [

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Http;
  * with every request. The tax service accepts only the IP registered for the
  * register and its client certificate. Answers look like
  * {code, message, errorMessage, result}; code 0 is success.
+ * Follows the manual of 02.2025 (eMark codes, sourceCrn on returns).
  *
  * Modes: "mock" answers like the tax service without leaving the server
  * (EhdmMock), "test" is the tax service's test system, "live" the real one.
@@ -74,9 +75,10 @@ class EhdmClient
      * Prints a sale receipt with goods (mode 2). Returns the tax service's
      * result: receiptId, crn, sn, tin, taxpayer, address, time, fiscal, total, change, qr.
      */
-    public function printReceipt(array $items, float $cash, float $card, ?string $partnerTin, int $cashierId): array
+    public function printReceipt(array $items, float $cash, float $card, ?string $partnerTin, int $cashierId, array $emarks = []): array
     {
-        return (array) $this->call('print', [
+        // eMark codes (դրոշմավորման կոդեր) belong to the receipt, not to its rows.
+        return (array) $this->call('print', ($emarks ? ['emarks' => array_values($emarks)] : []) + [
             'cardAmount' => $card,
             'cashAmount' => $cash,
             'partialAmount' => 0,
@@ -96,20 +98,22 @@ class EhdmClient
     /**
      * The receipt being returned, with its rows' receiptProductId.
      */
-    public function returnedReceiptInfo(string $receiptId): array
+    public function returnedReceiptInfo(string $receiptId, ?string $sourceCrn = null): array
     {
-        return (array) $this->call('getReturnedReceiptInfo', ['receiptId' => $receiptId]);
+        return (array) $this->call('getReturnedReceiptInfo', ['receiptId' => $receiptId, 'sourceCrn' => $sourceCrn ?? $this->crn()]);
     }
 
     /**
      * @param  array<int, array{receiptProductId: int, quantity: float}>  $items
      */
-    public function printReturn(string $receiptId, array $items, float $cash, float $card): array
+    public function printReturn(string $receiptId, array $items, float $cash, float $card, array $emarks = [], ?string $sourceCrn = null): array
     {
-        return (array) $this->call('printReturnReceipt', [
+        return (array) $this->call('printReturnReceipt', ($emarks ? ['emarks' => array_values($emarks)] : []) + [
             'receiptId' => $receiptId,
+            'sourceCrn' => $sourceCrn ?? $this->crn(),
             'cardAmountForReturn' => $card,
             'cashAmountForReturn' => $cash,
+            'prePaymentAmountForReturn' => 0,
             'returnItemList' => $items,
         ]);
     }
