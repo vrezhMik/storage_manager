@@ -14,6 +14,8 @@ export type SentDoc = {
   type: DocType;
   status: DocStatus;
   serialNo: string | null;
+  srcId: string | null;
+  signRequestId: string | null;
   buyerTin: string | null;
   buyerName: string | null;
   deliveredAt: string | null;
@@ -76,12 +78,12 @@ const viaExtension = (path: string, payload: Record<string, unknown>) =>
   });
 
 // The tax service login, done from the device; the token is kept for 20 minutes.
-let deviceToken: { value: string; until: number; apiUrl: string } | null = null;
+let deviceToken: { value: string; until: number; apiUrl: string; tin: string } | null = null;
 
-const deviceLogin = async (fresh: boolean) => {
+export const deviceLogin = async (fresh: boolean) => {
   if (!fresh && deviceToken && deviceToken.until > Date.now()) return deviceToken;
   const native = nativeBridge()!;
-  const login = await authFetch<{ url: string; apiUrl: string; envelope: string }>(`${API_BASE}/sales/device-login`);
+  const login = await authFetch<{ url: string; apiUrl: string; tin: string; envelope: string }>(`${API_BASE}/sales/device-login`);
   const res = await native.request({
     url: login.url,
     method: "POST",
@@ -93,7 +95,7 @@ const deviceLogin = async (fresh: boolean) => {
     const message = /Message="([^"]*)"/.exec(res.body)?.[1];
     throw new Error(`Login to e-invoicing failed${message ? `: ${message}` : ` (HTTP ${res.status})`}`);
   }
-  deviceToken = { value: token.trim(), until: Date.now() + 20 * 60 * 1000, apiUrl: login.apiUrl };
+  deviceToken = { value: token.trim(), until: Date.now() + 20 * 60 * 1000, apiUrl: login.apiUrl, tin: login.tin };
   return deviceToken;
 };
 

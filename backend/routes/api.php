@@ -35,6 +35,8 @@ Route::middleware(['auth.jwt', 'section:sales'])->prefix('sales')->group(functio
     Route::post('documents', [SalesController::class, 'store']);
     Route::post('documents/{document}/sign', [SalesController::class, 'sign']);
     Route::get('documents/{document}/sign-status', [SalesController::class, 'signStatus']);
+    Route::get('sign-info', [SalesController::class, 'signInfo']);
+    Route::post('documents/{document}/device-sign', [SalesController::class, 'deviceSign']);
 });
 Route::middleware(['auth.jwt', 'section:assistant'])->post('assistant/search', [AssistantController::class, 'search']);
 Route::middleware(['auth.jwt', 'section:assistant'])->post('assistant/intent', [AssistantController::class, 'intent']);

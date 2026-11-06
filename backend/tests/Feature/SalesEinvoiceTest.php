@@ -265,6 +265,29 @@ class SalesEinvoiceTest extends TestCase
             ->assertJson(fn ($json) => $json->where('envelope', fn ($env) => str_contains($env, 'Tin="01234567"') && str_contains($env, 'Password="tax-pass"'))->etc());
     }
 
+    public function test_the_app_records_a_draft_and_its_signing_without_the_server_calling_the_tax_service(): void
+    {
+        Http::fake();
+        $user = $this->user();
+        $user->update(['mobile_id_phone' => '091123456']);
+        $headers = $this->headers($user);
+
+        $id = $this->postJson('/api/sales/documents', $this->servicesDoc() + ['device' => [
+            'srcId' => 'b72f7739-a0fc-44d4-87bf-5967a7c7dbf6', 'ok' => true, 'response' => ['ok' => true],
+        ]], $headers)->assertCreated()->assertJsonPath('status', 'DRAFT')->json('id');
+
+        $this->getJson('/api/sales/sign-info', $headers)
+            ->assertOk()->assertJsonPath('method', 'mobile_id')->assertJsonPath('phone', '37491123456')->assertJsonMissingPath('password');
+
+        $this->postJson("/api/sales/documents/{$id}/device-sign", ['state' => 'STARTED', 'requestId' => '0f3b4c55-6f7e-4a1b-9c2d-3e4f5a6b7c8d', 'method' => 'mobile_id'], $headers)
+            ->assertJsonPath('status', 'SIGNING');
+        $this->postJson("/api/sales/documents/{$id}/device-sign", ['state' => 'SIGNED', 'serialNo' => 'ԱԱ55555555'], $headers)
+            ->assertJsonPath('status', 'ISSUED')->assertJsonPath('serialNo', 'ԱԱ55555555');
+
+        $this->getJson('/api/sales/device-login', $headers)->assertJsonPath('tin', '01234567');
+        Http::assertNothingSent();
+    }
+
     public function test_unknown_classifier_code_is_explained(): void
     {
         $this->fakeTaxService();

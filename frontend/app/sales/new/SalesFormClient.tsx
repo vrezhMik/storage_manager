@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatAmount } from "../../reports/sales/salesData";
+import { createDraftOnDevice, startSigningOnDevice } from "../einvoiceDevice";
 import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, hasSrcExtension, nativeBridge, SrcSessionError, srcFetch, TYPE_LABELS } from "../salesShared";
 
 // The form for a new account document (հաշիվ-վավերագիր): saved in e-invoicing
@@ -104,32 +105,57 @@ export function SalesFormView() {
     if (sign && !window.confirm(CONFIRM_SIGN)) return;
     setSending(true);
     setResult(null);
+    const doc = {
+      type,
+      buyerTin,
+      buyerName: buyerName || null,
+      buyerAddress: buyerAddress || null,
+      deliveredAt,
+      additionalInfo: additionalInfo || null,
+      items: rows.map((r) => ({
+        name: r.name.trim(),
+        classifierCode: goods ? r.classifierCode.trim() : null,
+        unit: r.unit.trim(),
+        quantity: num(r.quantity),
+        unitPrice: num(r.unitPrice),
+      })),
+    };
     try {
+      if (nativeBridge()) {
+        // Flexit app: the device sends the draft (its own IP); the server records it.
+        const device = await createDraftOnDevice(doc);
+        const saved = await authFetch<{ id: number }>(`${API_BASE}/sales/documents`, {
+          method: "POST",
+          body: JSON.stringify({ ...doc, device }),
+        });
+        if (!device.ok) {
+          setResult({ ok: false, text: errorText(device.error ?? "") });
+          return;
+        }
+        if (sign) {
+          try {
+            await startSigningOnDevice(saved.id, device.srcId);
+          } catch (err) {
+            await authFetch(`${API_BASE}/sales/documents/${saved.id}/device-sign`, {
+              method: "POST",
+              body: JSON.stringify({ state: "FAILED", message: (err as Error).message }),
+            }).catch(() => undefined);
+          }
+        }
+        router.push((sign ? "/sales/" : "/sales/?created=1") as Route);
+        return;
+      }
+
       await authFetch(`${API_BASE}/sales/documents`, {
         method: "POST",
-        body: JSON.stringify({
-          type,
-          buyerTin,
-          buyerName: buyerName || null,
-          buyerAddress: buyerAddress || null,
-          deliveredAt,
-          additionalInfo: additionalInfo || null,
-          sign,
-          items: rows.map((r) => ({
-            name: r.name.trim(),
-            classifierCode: goods ? r.classifierCode.trim() : null,
-            unit: r.unit.trim(),
-            quantity: num(r.quantity),
-            unitPrice: num(r.unitPrice),
-          })),
-        }),
+        body: JSON.stringify({ ...doc, sign }),
       });
       // Saved: back to the list, which follows the signing.
       router.push((sign ? "/sales/" : "/sales/?created=1") as Route);
       return;
     } catch (err) {
       // The draft was saved but signing did not start: the list shows why.
-      if (/"id":s*d+/.test(String((err as Error)?.message))) {
+      if (/"id":\s*\d+/.test(String((err as Error)?.message))) {
         router.push("/sales/" as Route);
         return;
       }

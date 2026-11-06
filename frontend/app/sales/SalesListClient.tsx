@@ -17,7 +17,9 @@ import {
   SignMethod,
   SIGNING_TEXT,
   TYPE_LABELS,
+  nativeBridge,
 } from "./salesShared";
+import { checkSigningOnDevice, startSigningOnDevice } from "./einvoiceDevice";
 
 const POLL_MS = 3000;
 
@@ -66,8 +68,16 @@ export function SalesListView() {
     const timer = window.setTimeout(async () => {
       polling.current = true;
       try {
+        // In the Flexit apps the device asks the tax service (its own IP);
+        // null means "still waiting".
+        const device = nativeBridge() !== null;
         const answers = await Promise.all(
-          signing.map((d) => authFetch<SignAnswer>(`${API_BASE}/sales/documents/${d.id}/sign-status`).catch(() => null)),
+          signing.map((d) =>
+            (device && d.signRequestId && d.srcId
+              ? (checkSigningOnDevice(d.id, d.signRequestId, d.srcId) as Promise<SignAnswer | null>)
+              : authFetch<SignAnswer>(`${API_BASE}/sales/documents/${d.id}/sign-status`)
+            ).catch(() => null),
+          ),
         );
         answers.forEach((a) => {
           if (a?.status === "ISSUED") setNotice({ ok: true, text: `Փաստաթուղթը դուրսգրված է${a.serialNo ? `, սերիա-համար՝ ${a.serialNo}` : ""}։` });
@@ -87,7 +97,19 @@ export function SalesListView() {
     setBusyId(doc.id);
     setNotice(null);
     try {
-      await authFetch<SignAnswer>(`${API_BASE}/sales/documents/${doc.id}/sign`, { method: "POST" });
+      if (nativeBridge() && doc.srcId) {
+        try {
+          await startSigningOnDevice(doc.id, doc.srcId);
+        } catch (err) {
+          await authFetch(`${API_BASE}/sales/documents/${doc.id}/device-sign`, {
+            method: "POST",
+            body: JSON.stringify({ state: "FAILED", message: String((err as Error)?.message ?? err) }),
+          }).catch(() => null);
+          throw err;
+        }
+      } else {
+        await authFetch<SignAnswer>(`${API_BASE}/sales/documents/${doc.id}/sign`, { method: "POST" });
+      }
     } catch (err) {
       setNotice({ ok: false, text: errorText(err) });
     } finally {

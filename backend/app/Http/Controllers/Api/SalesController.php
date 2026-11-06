@@ -44,6 +44,7 @@ class SalesController extends Controller
         return response()->json([
             'url' => (string) config('services.einvoice.login_url', EinvoiceClient::LOGIN_URL),
             'apiUrl' => EinvoiceClient::API_URL,
+            'tin' => $request->user()->dbEntry->einvoice_tin,
             'envelope' => $client->loginEnvelope(),
         ])->header('Cache-Control', 'no-store');
     }
@@ -100,6 +101,7 @@ class SalesController extends Controller
                 'total' => (float) $doc->total,
                 'serialNo' => $doc->serial_no,
                 'signedAt' => $doc->signed_at?->toIso8601String(),
+                'signRequestId' => $doc->sign_request_id,
                 'error' => $doc->error,
                 'user' => $doc->user?->name,
                 'createdAt' => $doc->created_at?->toIso8601String(),
@@ -241,7 +243,18 @@ class SalesController extends Controller
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'items.*.unitPrice' => ['required', 'numeric', 'gte:0'],
             'sign' => ['sometimes', 'boolean'],
+            // From the Flexit apps: the device already sent the draft to the
+            // tax service; only its answer is recorded here.
+            'device' => ['sometimes', 'array'],
+            'device.srcId' => ['required_with:device', 'uuid'],
+            'device.ok' => ['required_with:device', 'boolean'],
+            'device.error' => ['nullable', 'string', 'max:2000'],
+            'device.response' => ['nullable', 'array'],
         ]);
+
+        if (isset($data['device'])) {
+            return $this->recordDeviceDraft($request, $data);
+        }
 
         $client = $this->client($request);
         if ($client instanceof JsonResponse) {
@@ -290,5 +303,98 @@ class SalesController extends Controller
             'srcId' => $doc->src_id,
             'error' => $doc->error,
         ], $doc->status === EinvoiceDocument::STATUS_DRAFT ? Response::HTTP_CREATED : Response::HTTP_BAD_GATEWAY);
+    }
+
+    private function recordDeviceDraft(Request $request, array $data): JsonResponse
+    {
+        $device = $data['device'];
+        $doc = EinvoiceDocument::create([
+            'user_id' => $request->user()->id,
+            'db_entry_id' => $request->user()->db_entry_id,
+            'type' => $data['type'],
+            'status' => $device['ok'] ? EinvoiceDocument::STATUS_DRAFT : EinvoiceDocument::STATUS_FAILED,
+            'src_id' => $device['srcId'],
+            'buyer_tin' => $data['buyerTin'],
+            'buyer_name' => $data['buyerName'] ?? null,
+            'delivered_at' => $data['deliveredAt'],
+            'total' => round(collect($data['items'])->sum(fn ($i) => round($i['quantity'] * $i['unitPrice'], 2)), 2),
+            'items' => $data['items'],
+            'error' => $device['ok'] ? null : ($device['error'] ?? 'Rejected by e-invoicing'),
+            'response' => $device['response'] ?? null,
+        ]);
+
+        return response()->json([
+            'id' => $doc->id,
+            'status' => $doc->status,
+            'srcId' => $doc->src_id,
+            'error' => $doc->error,
+        ], Response::HTTP_CREATED);
+    }
+
+    /**
+     * For the Flexit apps: how this user signs, with what the device needs
+     * to send the signature request itself.
+     */
+    public function signInfo(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $method = $user->signMethod();
+        if ($method === null) {
+            return response()->json([
+                'message' => 'No signing method for this user. Fill in CoSign, Mobile ID or Nikita in the admin panel (Users).',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        return response()->json(array_filter([
+            'method' => $method,
+            'username' => $method === 'cosign' ? $user->cosign_username : null,
+            'password' => $method === 'cosign' ? $user->cosign_password : null,
+            'phone' => match ($method) {
+                'mobile_id' => EinvoiceClient::phone((string) $user->mobile_id_phone),
+                'nikita' => EinvoiceClient::phone((string) $user->nikita_phone),
+                default => null,
+            },
+        ], fn ($v) => $v !== null))->header('Cache-Control', 'no-store');
+    }
+
+    /**
+     * From the Flexit apps: the device sent the signature request
+     * (requestId = the tax service's sign task) or got the final result.
+     */
+    public function deviceSign(Request $request, EinvoiceDocument $document): JsonResponse
+    {
+        if ($document->db_entry_id !== $request->user()?->db_entry_id) {
+            abort(Response::HTTP_NOT_FOUND);
+        }
+
+        $data = $request->validate([
+            'state' => ['required', Rule::in(['STARTED', 'SIGNED', 'FAILED'])],
+            'requestId' => ['required_if:state,STARTED', 'nullable', 'uuid'],
+            'method' => ['nullable', Rule::in(['cosign', 'mobile_id', 'nikita'])],
+            'serialNo' => ['nullable', 'string', 'max:64'],
+            'signedAt' => ['nullable', 'date'],
+            'message' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        if ($data['state'] === 'STARTED') {
+            if ($document->status !== EinvoiceDocument::STATUS_DRAFT) {
+                return response()->json(['message' => 'Only a draft can be signed'], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $document->status = EinvoiceDocument::STATUS_SIGNING;
+            $document->sign_request_id = $data['requestId'];
+            $document->sign_method = $data['method'] ?? $request->user()->signMethod();
+            $document->error = null;
+        } elseif ($data['state'] === 'SIGNED') {
+            $document->status = EinvoiceDocument::STATUS_ISSUED;
+            $document->serial_no = $data['serialNo'] ?? null;
+            $document->signed_at = $data['signedAt'] ?? now();
+            $document->error = null;
+        } else {
+            $document->status = EinvoiceDocument::STATUS_DRAFT;
+            $document->error = $data['message'] ?? 'Signing failed';
+        }
+        $document->save();
+
+        return response()->json($this->signAnswer($document));
     }
 }
