@@ -1,0 +1,13 @@
+{
+  "name": "flexit-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Flexit for Android: the terminal in an app; requests that need the phone's own IP (tax service, 1C) are made by the phone (CapacitorHttp).",
+  "devDependencies": {
+    "@capacitor/cli": "6.2.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "6.2.0",
+    "@capacitor/core": "6.2.0"
+  }
+}

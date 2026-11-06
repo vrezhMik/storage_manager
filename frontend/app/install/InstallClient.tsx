@@ -21,8 +21,9 @@ const isStandalone = () =>
 
 const cardClass = "rounded-xl border bg-card text-card-foreground shadow p-6";
 
-// The Windows app installer, kept on the API server (backend/public/downloads).
+// The Windows and Android apps, kept on the API server (backend/public/downloads).
 const WINDOWS_DOWNLOAD = `${API_BASE.replace(/\/api$/, "")}/downloads/Flexit-Setup.exe`;
+const ANDROID_DOWNLOAD = `${API_BASE.replace(/\/api$/, "")}/downloads/Flexit.apk`;
 
 function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
@@ -113,6 +114,27 @@ export default function InstallClient() {
             </div>
           ) : (
             <>
+            {platform === "android" && (
+              <div className={`${cardClass} space-y-3`}>
+                <h2 className="font-semibold text-foreground">Flexit հավելված Android-ի համար</h2>
+                <p className="text-sm text-muted-foreground">
+                  ՊԵԿ-ի (e-invoicing) և Մանրածախի հարցումները կատարվում են հենց ձեր հեռախոսից։
+                </p>
+                <a
+                  href={ANDROID_DOWNLOAD}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-base font-semibold text-primary-foreground shadow hover:bg-primary/90"
+                >
+                  ⬇ Ներբեռնել Flexit (Android)
+                </a>
+                <ol className="space-y-3">
+                  <Step n={1}>Ներբեռնելուց հետո բացեք <b>Flexit.apk</b> ֆայլը (ծանուցումներից կամ «Ներբեռնումներ» պանակից)։</Step>
+                  <Step n={2}>
+                    Եթե հեռախոսը հարցնի, թույլ տվեք տեղադրել այս աղբյուրից (<b>«Разрешить из этого источника»</b>)։
+                  </Step>
+                  <Step n={3}>Սեղմեք <b>«Տեղադրել»</b>։ Գլխավոր էկրանին կհայտնվի <b>Flexit</b>-ը։</Step>
+                </ol>
+              </div>
+            )}
             {platform === "desktop" && (
               <div className={`${cardClass} space-y-3`}>
                 <h2 className="font-semibold text-foreground">Flexit ծրագիր Windows-ի համար</h2>

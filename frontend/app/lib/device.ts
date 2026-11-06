@@ -12,10 +12,51 @@ export type NativeRequest = (spec: {
   timeoutMs?: number;
 }) => Promise<{ status: number; headers: Record<string, string>; body: string }>;
 
-export const nativeBridge = (): { platform: string; request: NativeRequest } | null =>
-  typeof window !== "undefined"
-    ? ((window as unknown as { flexitNative?: { platform: string; request: NativeRequest } }).flexitNative ?? null)
-    : null;
+type CapacitorHttp = {
+  request: (options: {
+    url: string;
+    method: string;
+    headers?: Record<string, string>;
+    data?: string;
+    responseType?: "text";
+    connectTimeout?: number;
+    readTimeout?: number;
+  }) => Promise<{ status: number; headers: Record<string, string>; data: unknown }>;
+};
+
+type CapacitorGlobal = { isNativePlatform?: () => boolean; Plugins?: { CapacitorHttp?: CapacitorHttp } };
+
+// Android app (tools/android-app, Capacitor): native HTTP from the phone.
+const capacitorBridge = (): { platform: string; request: NativeRequest } | null => {
+  const cap = (window as unknown as { Capacitor?: CapacitorGlobal }).Capacitor;
+  const http = cap?.Plugins?.CapacitorHttp;
+  if (!cap?.isNativePlatform?.() || !http) return null;
+  return {
+    platform: "android",
+    request: async ({ url, method = "GET", headers = {}, body, timeoutMs = 30000 }) => {
+      const res = await http.request({
+        url,
+        method,
+        headers,
+        data: body,
+        responseType: "text",
+        connectTimeout: timeoutMs,
+        readTimeout: timeoutMs,
+      });
+      return {
+        status: res.status,
+        headers: res.headers ?? {},
+        body: typeof res.data === "string" ? res.data : JSON.stringify(res.data ?? ""),
+      };
+    },
+  };
+};
+
+export const nativeBridge = (): { platform: string; request: NativeRequest } | null => {
+  if (typeof window === "undefined") return null;
+  const desktop = (window as unknown as { flexitNative?: { platform: string; request: NativeRequest } }).flexitNative;
+  return desktop ?? capacitorBridge();
+};
 
 /**
  * A report the device may ask 1C for itself (the Retail block). In the apps

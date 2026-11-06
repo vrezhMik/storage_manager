@@ -1,0 +1,15 @@
+{
+  "appId": "am.flexit.terminal",
+  "appName": "Flexit",
+  "webDir": "www",
+  "server": {
+    "url": "https://terminal.flexit.am",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": false }
+  }
+}
