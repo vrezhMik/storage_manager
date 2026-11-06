@@ -1,6 +1,9 @@
 package am.flexit.terminal;
 
+import android.content.Context;
 import android.net.Uri;
+import android.print.PrintAttributes;
+import android.print.PrintManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import java.io.ByteArrayOutputStream;
@@ -16,6 +19,7 @@ import org.json.JSONObject;
 
 /**
  * Device requests for the terminal page:
+ *   FlexitAndroid.print() opens the system print dialog;
  *   FlexitAndroid.request(id, '{"url","method","headers","body","timeoutMs"}')
  * answers by calling window.__flexitAndroidDone(id, '{"status","headers","body"}'
  * or '{"error"}'). Only the terminal (https://terminal.flexit.am) may use it.
@@ -40,6 +44,27 @@ public class FlexitBridge {
                 return;
             }
             new Thread(() -> reply(id, perform(specJson))).start();
+        });
+    }
+
+    /**
+     * FlexitAndroid.print(): the WebView ignores window.print(), so the page
+     * asks for the system print dialog (printers, "Save as PDF"). The page's
+     * print CSS decides what is printed (e.g. only the ՀԴՄ receipt).
+     */
+    @JavascriptInterface
+    public void print() {
+        webView.post(() -> {
+            Uri page = Uri.parse(String.valueOf(webView.getUrl()));
+            if (!"https".equals(page.getScheme()) || !TRUSTED_HOST.equals(page.getHost())) {
+                return;
+            }
+            PrintManager printManager = (PrintManager) webView.getContext().getSystemService(Context.PRINT_SERVICE);
+            if (printManager == null) {
+                return;
+            }
+            String name = "Flexit";
+            printManager.print(name, webView.createPrintDocumentAdapter(name), new PrintAttributes.Builder().build());
         });
     }
 
