@@ -8,7 +8,75 @@ import AuthGuard from "../components/AuthGuard";
 import { API_BASE, authFetch } from "../lib/auth";
 import { formatDisplayDate } from "../reports/components/DateRangeModal";
 import { formatAmount } from "../reports/sales/salesData";
-import { cardClass, CONFIRM_SIGN, errorText, SentDoc, SignAnswer, SignMethod, SIGNING_TEXT, TYPE_LABELS } from "./salesShared";
+import {
+  cardClass,
+  CONFIRM_SIGN,
+  errorText,
+  SentDoc,
+  SignAnswer,
+  SignMethod,
+  SIGNING_TEXT,
+  SRC_LOGIN_PAGE,
+  SrcSessionError,
+  srcFetch,
+  TYPE_LABELS,
+} from "./salesShared";
+
+// Checks whether this browser can reach e-invoicing with its own session.
+function BrowserCheck() {
+  const [state, setState] = useState<{ busy: boolean; ok?: boolean; text?: string }>({ busy: false });
+
+  const check = async () => {
+    const tin = window.prompt("Գրեք որևէ ՀՎՀՀ (8 թիվ) ստուգման համար, օրինակ ձեր ընկերության ՀՎՀՀ-ն");
+    if (!tin || !/^\d{8}$/.test(tin.trim())) return;
+    setState({ busy: true });
+    try {
+      const answer = await srcFetch("tpinfo/tp-info-by-tin", { tin: tin.trim(), checkDate: new Date().toISOString() });
+      const payload = (answer.payload ?? {}) as Record<string, unknown>;
+      setState({
+        busy: false,
+        ok: answer.ok,
+        text: answer.ok
+          ? `Աշխատում է ✓ ՊԵԿ-ը պատասխանեց ձեր բրաուզերից՝ ${String(payload.name ?? payload.taxpayerName ?? JSON.stringify(payload).slice(0, 120))}`
+          : `ՊԵԿ-ը պատասխանեց, բայց սխալով՝ ${answer.failure?.message ?? answer.failure?.code ?? "անհայտ"}`,
+      });
+    } catch (err) {
+      setState({
+        busy: false,
+        ok: false,
+        text:
+          err instanceof SrcSessionError
+            ? "ՊԵԿ-ը ձեր բրաուզերում մուտքը չտեսավ։ Մտեք file-online.taxservice.am (նույն բրաուզերում) և կրկին ստուգեք։ Եթե արդեն մտած եք, ուրեմն բրաուզերը թույլ չի տալիս օգտագործել այդ սեսիան տերմինալից։"
+            : `Կապ չստացվեց՝ ${(err as Error).message}`,
+      });
+    }
+  };
+
+  return (
+    <div className={`${cardClass} space-y-2`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm text-muted-foreground">
+          Փորձ. ՊԵԿ-ի հետ կապ ուղղակի ձեր բրաուզերից (ձեր IP-ով)։ Նախ մտեք{" "}
+          <a href={SRC_LOGIN_PAGE} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+            file-online.taxservice.am
+          </a>
+          ։
+        </span>
+        <button
+          type="button"
+          onClick={check}
+          disabled={state.busy}
+          className="rounded-md border border-input px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+        >
+          {state.busy ? "Ստուգվում է…" : "Ստուգել ՊԵԿ կապը (ձեր բրաուզերից)"}
+        </button>
+      </div>
+      {state.text && (
+        <p className={`rounded-md px-3 py-2 text-sm ${state.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>{state.text}</p>
+      )}
+    </div>
+  );
+}
 
 // "Վաճառքներ": the documents sent to e-invoicing. Drafts can be signed here;
 // documents being signed are checked every few seconds until issued.
@@ -106,6 +174,8 @@ export function SalesListView() {
               ＋ Ստեղծել նոր
             </Link>
           </div>
+
+          <BrowserCheck />
 
           {notice && (
             <p className={`rounded-xl px-4 py-3 text-sm ${notice.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>

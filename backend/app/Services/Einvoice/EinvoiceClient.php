@@ -3,6 +3,7 @@
 namespace App\Services\Einvoice;
 
 use App\Models\DbEntry;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -55,10 +56,17 @@ class EinvoiceClient
                 .' ClientType="API" ClientDescription="Flexit terminal"/>'
                 .'</soapenv:Body></soapenv:Envelope>';
 
-            $response = Http::timeout(30)
-                ->withBody($body, 'text/xml;charset=UTF-8')
-                ->withOptions(['http_errors' => false])
-                ->post(self::LOGIN_URL);
+            // The login service may only answer Armenian addresses: services.einvoice.login_url
+            // can point to a relay in Armenia that forwards to the same service.
+            try {
+                $response = Http::connectTimeout(10)
+                    ->timeout(30)
+                    ->withBody($body, 'text/xml;charset=UTF-8')
+                    ->withOptions(['http_errors' => false])
+                    ->post((string) config('services.einvoice.login_url', self::LOGIN_URL));
+            } catch (ConnectionException) {
+                throw new EinvoiceException('The tax service login (ews.taxservice.am) is not reachable from this server');
+            }
 
             if (preg_match('#<AuthToken>([^<]+)</AuthToken>#', $response->body(), $m)) {
                 return trim($m[1]);
@@ -78,11 +86,16 @@ class EinvoiceClient
     public function call(string $path, array $payload): array
     {
         for ($attempt = 0; $attempt < 2; $attempt++) {
-            $response = Http::timeout(60)
-                ->acceptJson()
-                ->withHeaders(['Cookie' => 'jwt-auth-token='.$this->token($attempt > 0)])
-                ->withOptions(['http_errors' => false])
-                ->post(self::API_URL.'/'.$path, ['payload' => $payload]);
+            $token = $this->token($attempt > 0);
+            try {
+                $response = Http::timeout(60)
+                    ->acceptJson()
+                    ->withHeaders(['Cookie' => 'jwt-auth-token='.$token])
+                    ->withOptions(['http_errors' => false])
+                    ->post(self::API_URL.'/'.$path, ['payload' => $payload]);
+            } catch (ConnectionException) {
+                throw new EinvoiceException('E-invoicing (e-invoicing.taxservice.am) is not reachable from this server');
+            }
 
             if (in_array($response->status(), [401, 403], true) && $attempt === 0) {
                 continue;

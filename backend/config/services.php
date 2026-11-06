@@ -43,6 +43,12 @@ return [
         'chat_keep_alive' => env('OLLAMA_CHAT_KEEP_ALIVE', '30m'),
     ],
 
+    // The tax service's e-invoicing. Its login service may only answer Armenian
+    // addresses; EINVOICE_LOGIN_URL can point to a relay in Armenia.
+    'einvoice' => [
+        'login_url' => env('EINVOICE_LOGIN_URL', 'https://ews.taxservice.am/taxsystem-fe-ws/taxpayer/loginService'),
+    ],
+
     // Local translator for the assistant (tools/translator). Empty URL = off.
     'translator' => [
         'url' => env('TRANSLATOR_URL', ''),

@@ -247,6 +247,15 @@ class SalesEinvoiceTest extends TestCase
         $this->postJson("/api/sales/documents/{$doc->id}/sign", [], $this->headers($user))->assertNotFound();
     }
 
+    public function test_an_unreachable_login_service_gives_a_clear_error(): void
+    {
+        Http::fake(['ews.taxservice.am/*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timed out')]);
+
+        $this->getJson('/api/sales/taxpayer?tin=07654321', $this->headers($this->user()))
+            ->assertStatus(502)
+            ->assertJsonPath('message', 'The tax service login (ews.taxservice.am) is not reachable from this server');
+    }
+
     public function test_unknown_classifier_code_is_explained(): void
     {
         $this->fakeTaxService();
