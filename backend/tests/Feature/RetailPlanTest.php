@@ -104,6 +104,27 @@ class RetailPlanTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_device_mode_gives_the_ready_1c_request_instead_of_calling_it(): void
+    {
+        Http::fake();
+        $user = $this->userWithRetail(true, 'Մաշտոց 12');
+
+        $spec = $this->getJson('/api/retail-plan?date=2026-11-05&device=1&Store=Կոմիտաս', ['Authorization' => 'Bearer '.$this->token($user)])
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->json();
+
+        Http::assertNothingSent();
+        $this->assertStringStartsWith('http://1c.test/terminal/hs/Eportal/RetailPlan?', $spec['url']);
+        parse_str(parse_url($spec['url'], PHP_URL_QUERY), $query);
+        $this->assertSame(['Date' => '05.11.2026', 'Store' => 'Մաշտոց 12'], $query);
+        $this->assertSame('Basic '.base64_encode('terminal:secret'), $spec['headers']['Authorization']);
+
+        // Other reports never hand out the request.
+        $this->getJson('/api/debts?start=2026-11-01&end=2026-11-05&device=1', ['Authorization' => 'Bearer '.$this->token($user)]);
+        $this->assertArrayNotHasKey('url', (array) $this->getJson('/api/sales-monthly?start=2026-11-01&end=2026-11-05&device=1', ['Authorization' => 'Bearer '.$this->token($user)])->json());
+    }
+
     public function test_rejects_a_bad_date(): void
     {
         $user = $this->userWithRetail(true);

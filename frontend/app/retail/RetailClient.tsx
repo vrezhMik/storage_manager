@@ -4,7 +4,7 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import AuthGuard from "../components/AuthGuard";
-import { API_BASE, authFetch } from "../lib/auth";
+import { fetchDeviceReport } from "../lib/device";
 import { formatDisplayDate } from "../reports/components/DateRangeModal";
 import { formatAmount, toNumber } from "../reports/sales/salesData";
 
@@ -390,7 +390,7 @@ export default function RetailClient() {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    authFetch<RetailPlanData>(`${API_BASE}/retail-plan?date=${date}`, { signal: controller.signal })
+    fetchDeviceReport<RetailPlanData>(`retail-plan?date=${date}`, controller.signal)
       .then((res) => {
         if (!controller.signal.aborted) setData(res ?? {});
       })

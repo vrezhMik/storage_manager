@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { INSTALL_READY_EVENT } from "../components/PwaSetup";
+import { API_BASE } from "../lib/auth";
 
 type Platform = "ios" | "android" | "desktop";
 
@@ -19,6 +20,9 @@ const isStandalone = () =>
   (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
 const cardClass = "rounded-xl border bg-card text-card-foreground shadow p-6";
+
+// The Windows app installer, kept on the API server (backend/public/downloads).
+const WINDOWS_DOWNLOAD = `${API_BASE.replace(/\/api$/, "")}/downloads/Flexit-Setup.exe`;
 
 function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
@@ -108,8 +112,26 @@ export default function InstallClient() {
               </ol>
             </div>
           ) : (
+            <>
+            {platform === "desktop" && (
+              <div className={`${cardClass} space-y-3`}>
+                <h2 className="font-semibold text-foreground">Flexit ծրագիր Windows-ի համար</h2>
+                <p className="text-sm text-muted-foreground">
+                  ՊԵԿ-ի (e-invoicing) և Մանրածախի հարցումները կատարվում են հենց ձեր համակարգչից։
+                </p>
+                <a
+                  href={WINDOWS_DOWNLOAD}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-base font-semibold text-primary-foreground shadow hover:bg-primary/90"
+                >
+                  ⬇ Ներբեռնել Flexit (Windows)
+                </a>
+                <p className="text-xs text-muted-foreground">
+                  Եթե Windows-ը գրի «Windows защитил ваш компьютер», սեղմեք «Подробнее» → «Выполнить в любом случае»։
+                </p>
+              </div>
+            )}
             <div className={`${cardClass} space-y-4`}>
-              <h2 className="font-semibold text-foreground">{platform === "android" ? "Android" : "Համակարգիչ"}</h2>
+              <h2 className="font-semibold text-foreground">{platform === "android" ? "Android" : "Համակարգիչ (բրաուզերով)"}</h2>
               {canPrompt ? (
                 <button
                   type="button"
@@ -130,6 +152,7 @@ export default function InstallClient() {
                 </ol>
               )}
             </div>
+            </>
           )}
 
           <p className="text-center text-xs text-muted-foreground">

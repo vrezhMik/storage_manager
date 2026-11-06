@@ -385,6 +385,9 @@ class OrderController extends Controller
         ] + $extraQuery);
     }
 
+    // Reports the Flexit apps may call from the device itself (?device=1).
+    private const DEVICE_TYPES = ['retail plan', 'retail suppliers'];
+
     private function proxy(Request $request, string $type, ?array $query = null): Response
     {
         $user = $request->user();
@@ -435,6 +438,19 @@ class OrderController extends Controller
         }
 
         $mergedQuery = array_merge($storedQuery, $query);
+
+        // ?device=1 (Retail block in the Flexit apps): the device calls 1C
+        // itself, so 1C sees the device's IP. It gets the ready request; the
+        // store and dates are still decided here, from the user's account.
+        if ($request->boolean('device') && in_array($type, self::DEVICE_TYPES, true)) {
+            return response()->json([
+                'url' => $baseUrl.'?'.http_build_query($mergedQuery, '', '&', PHP_QUERY_RFC3986),
+                'headers' => [
+                    'Authorization' => 'Basic '.base64_encode($dbEntry->username.':'.$dbEntry->password),
+                    'Accept' => 'application/json',
+                ],
+            ])->header('Cache-Control', 'no-store');
+        }
 
         $response = Http::withBasicAuth($dbEntry->username, $dbEntry->password)
             ->acceptJson()

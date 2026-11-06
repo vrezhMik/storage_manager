@@ -1,4 +1,4 @@
-import { API_BASE, authFetch } from "../../lib/auth";
+import { fetchDeviceReport } from "../../lib/device";
 import { toNumber } from "../../reports/sales/salesData";
 
 // 1C (/retail-suppliers) returns posted goods receipts of the user's store for
@@ -55,7 +55,7 @@ const cache = new Map<string, { at: number; promise: Promise<SuppliersData> }>()
 export const loadSuppliers = (date: string): Promise<SuppliersData> => {
   const hit = cache.get(date);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.promise;
-  const promise = authFetch<SuppliersData>(`${API_BASE}/retail-suppliers?date=${date}&days=${DEFAULT_DAYS}`).then((r) => r ?? {});
+  const promise = fetchDeviceReport<SuppliersData>(`retail-suppliers?date=${date}&days=${DEFAULT_DAYS}`).then((r) => r ?? {});
   promise.catch(() => cache.delete(date));
   cache.set(date, { at: Date.now(), promise });
   return promise;

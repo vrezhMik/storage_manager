@@ -1,7 +1,7 @@
 {
   "name": "flexit-terminal",
   "productName": "Flexit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Flexit terminal for Windows: requests that need this computer's own IP (tax service, 1C) are made from this computer.",
   "main": "main.js",
   "private": true,
@@ -12,10 +12,24 @@
   "build": {
     "appId": "am.flexit.terminal",
     "productName": "Flexit",
-    "files": ["main.js", "preload.js", "icon.png"],
-    "win": { "target": "nsis", "icon": "icon.png" },
-    "nsis": { "oneClick": true, "perMachine": false, "shortcutName": "Flexit" },
-    "directories": { "output": "dist" }
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Flexit",
+      "artifactName": "Flexit-Setup.${ext}"
+    },
+    "directories": {
+      "output": "dist"
+    }
   },
   "devDependencies": {
     "electron": "33.2.0",

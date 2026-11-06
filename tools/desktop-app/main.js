@@ -13,22 +13,14 @@ const TRUSTED_ORIGINS = new Set([
   "http://localhost:3000",
 ]);
 
-// Hosts the bridge may call: the tax service, plus extra hosts (e.g. the 1C
-// server) listed in FLEXIT_ALLOWED_HOSTS, comma separated.
-const ALLOWED_HOSTS = [/(^|\.)taxservice\.am$/i];
-const extraHosts = (process.env.FLEXIT_ALLOWED_HOSTS || "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean);
-
-const hostAllowed = (url) => {
-  const host = url.hostname.toLowerCase();
-  return ALLOWED_HOSTS.some((re) => re.test(host)) || extraHosts.includes(host);
-};
-
+// Any http(s) host may be called, but only by the terminal pages above: the
+// terminal server prepares the requests (tax service, the company's 1C).
 ipcMain.handle("flexit-native-request", async (event, spec) => {
   const origin = new URL(event.senderFrame.url).origin;
   if (!TRUSTED_ORIGINS.has(origin)) throw new Error("This page may not make device requests");
 
   const url = new URL(String(spec?.url || ""));
-  if (!/^https?:$/.test(url.protocol) || !hostAllowed(url)) throw new Error(`Host not allowed: ${url.hostname}`);
+  if (!/^https?:$/.test(url.protocol)) throw new Error(`Not allowed: ${url.protocol}`);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.min(Number(spec.timeoutMs) || 30000, 120000));

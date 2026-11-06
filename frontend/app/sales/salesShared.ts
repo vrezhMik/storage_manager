@@ -1,4 +1,7 @@
 import { API_BASE, authFetch } from "../lib/auth";
+import { nativeBridge } from "../lib/device";
+
+export { nativeBridge };
 
 // Shared by the documents list (/sales) and the form (/sales/new).
 
@@ -71,19 +74,6 @@ const viaExtension = (path: string, payload: Record<string, unknown>) =>
     window.addEventListener("message", onMessage);
     window.postMessage({ type: "FLEXIT_SRC_REQUEST", id, path, payload }, window.location.origin);
   });
-
-// The Flexit desktop / mobile app (tools/desktop-app) gives the page
-// window.flexitNative.request(): the request is made by the device itself.
-type NativeRequest = (spec: {
-  url: string;
-  method?: string;
-  headers?: Record<string, string>;
-  body?: string;
-  timeoutMs?: number;
-}) => Promise<{ status: number; headers: Record<string, string>; body: string }>;
-
-export const nativeBridge = (): { platform: string; request: NativeRequest } | null =>
-  typeof window !== "undefined" ? ((window as unknown as { flexitNative?: { platform: string; request: NativeRequest } }).flexitNative ?? null) : null;
 
 // The tax service login, done from the device; the token is kept for 20 minutes.
 let deviceToken: { value: string; until: number; apiUrl: string } | null = null;
