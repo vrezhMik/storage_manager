@@ -50,12 +50,12 @@ const API_BASE =
 export { API_BASE };
 
 // What a page shows when its data can't be loaded. The server refuses marked
-// users outside the company network (code network_restricted) and names their IP.
+// users outside the company network (code network_restricted).
 export function loadErrorText(err: unknown): string {
   const text = err instanceof Error ? err.message : "";
-  if (!text.includes('"network_restricted"')) return "Չհաջողվեց ստանալ տվյալները";
-  const ip = text.match(/"ip":"([^"]+)"/)?.[1];
-  return `Այս բաժինը հասանելի է միայն կազմակերպության ցանցից։ Միացեք խանութի Wi-Fi-ին։${ip ? ` (Ձեր IP՝ ${ip})` : ""}`;
+  return text.includes('"network_restricted"')
+    ? "Այս բաժինը հասանելի է միայն կազմակերպության ցանցից։ Միացեք խանութի Wi-Fi-ին։"
+    : "Չհաջողվեց ստանալ տվյալները";
 }
 
 export function storeAuthTokens(data: {

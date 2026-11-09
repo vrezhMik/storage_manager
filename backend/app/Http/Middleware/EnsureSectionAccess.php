@@ -33,7 +33,6 @@ class EnsureSectionAccess
             return response()->json([
                 'code' => 'network_restricted',
                 'message' => 'This section is available only from the company network',
-                'ip' => $request->ip(),
             ], Response::HTTP_FORBIDDEN);
         }
 

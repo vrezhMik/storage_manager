@@ -68,7 +68,8 @@ class NetworkRestrictionTest extends TestCase
         foreach (['/api/retail-plan', '/api/retail-suppliers', '/api/price-check?barcode=1'] as $url) {
             $this->getFrom(self::OUTSIDE, $url, $user)
                 ->assertForbidden()
-                ->assertJson(['code' => 'network_restricted', 'ip' => self::OUTSIDE]);
+                ->assertJson(['code' => 'network_restricted'])
+                ->assertJsonMissingPath('ip');
         }
         Http::assertNothingSent();
     }
