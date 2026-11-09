@@ -104,10 +104,13 @@ export const fetchDeviceReport = async <T>(path: string, signal?: AbortSignal): 
   const native = nativeBridge();
   if (!native) return authFetch<T>(`${API_BASE}/${path}`, { signal });
 
-  const spec = await authFetch<{ url: string; headers: Record<string, string> }>(
+  const spec = await authFetch<{ url?: string; headers?: Record<string, string> } | undefined>(
     `${API_BASE}/${path}${path.includes("?") ? "&" : "?"}device=1`,
     { signal },
   );
+  // Price check goes through the device only for some users; for the others
+  // the server has already asked 1C and this is the answer.
+  if (!spec?.url || !spec.headers) return spec as T;
   const res = await native.request({ url: spec.url, method: "GET", headers: spec.headers, timeoutMs: 60000 });
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
   if (res.status >= 400) throw new Error(`Request failed (${res.status}): ${res.body.slice(0, 300)}`);

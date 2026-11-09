@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DbEntry;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -135,6 +136,10 @@ class OrderController extends Controller
         // URL saved like ".../GET_ORDER?Barcode=" -> the barcode is appended to the end as is.
         if ($endpoint && str_ends_with($endpoint, '=')) {
             $dbEntry = $request->user()->dbEntry;
+
+            if ($this->runsOnDevice($request, 'price check')) {
+                return $this->deviceRequest($dbEntry, $endpoint.rawurlencode($barcode));
+            }
 
             $response = Http::withBasicAuth($dbEntry->username, $dbEntry->password)
                 ->acceptJson()
@@ -388,6 +393,26 @@ class OrderController extends Controller
     // Reports the Flexit apps may call from the device itself (?device=1).
     private const DEVICE_TYPES = ['retail plan', 'retail suppliers'];
 
+    // Price check goes through the device only for users kept inside the company network.
+    private function runsOnDevice(Request $request, string $type): bool
+    {
+        return $request->boolean('device') && (
+            in_array($type, self::DEVICE_TYPES, true)
+            || ($type === 'price check' && $request->user()?->network_restricted)
+        );
+    }
+
+    private function deviceRequest(DbEntry $dbEntry, string $url): Response
+    {
+        return response()->json([
+            'url' => $url,
+            'headers' => [
+                'Authorization' => 'Basic '.base64_encode($dbEntry->username.':'.$dbEntry->password),
+                'Accept' => 'application/json',
+            ],
+        ])->header('Cache-Control', 'no-store');
+    }
+
     private function proxy(Request $request, string $type, ?array $query = null): Response
     {
         $user = $request->user();
@@ -442,14 +467,8 @@ class OrderController extends Controller
         // ?device=1 (Retail block in the Flexit apps): the device calls 1C
         // itself, so 1C sees the device's IP. It gets the ready request; the
         // store and dates are still decided here, from the user's account.
-        if ($request->boolean('device') && in_array($type, self::DEVICE_TYPES, true)) {
-            return response()->json([
-                'url' => $baseUrl.'?'.http_build_query($mergedQuery, '', '&', PHP_QUERY_RFC3986),
-                'headers' => [
-                    'Authorization' => 'Basic '.base64_encode($dbEntry->username.':'.$dbEntry->password),
-                    'Accept' => 'application/json',
-                ],
-            ])->header('Cache-Control', 'no-store');
+        if ($this->runsOnDevice($request, $type)) {
+            return $this->deviceRequest($dbEntry, $baseUrl.'?'.http_build_query($mergedQuery, '', '&', PHP_QUERY_RFC3986));
         }
 
         $response = Http::withBasicAuth($dbEntry->username, $dbEntry->password)

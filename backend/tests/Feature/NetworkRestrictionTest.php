@@ -88,6 +88,30 @@ class NetworkRestrictionTest extends TestCase
         $this->getFrom(self::OFFICE, '/api/price-check?barcode=1', $user)->assertOk();
     }
 
+    public function test_marked_users_price_check_goes_through_the_device(): void
+    {
+        $user = $this->user(true);
+
+        $this->getFrom(self::OFFICE, '/api/price-check?barcode=12%2034&device=1', $user)
+            ->assertOk()
+            ->assertJsonPath('url', 'http://1c.test/price?Barcode=12%2034')
+            ->assertJsonPath('headers.Authorization', 'Basic '.base64_encode('terminal:secret'));
+
+        $user->dbEntry->update(['api_price_check' => 'http://1c.test/price?Barcode=']);
+
+        $this->getFrom(self::OFFICE, '/api/price-check?barcode=5&device=1', $user->fresh())
+            ->assertJsonPath('url', 'http://1c.test/price?Barcode=5');
+        Http::assertNothingSent();
+    }
+
+    public function test_unmarked_users_price_check_stays_on_the_server(): void
+    {
+        $this->getFrom(self::OUTSIDE, '/api/price-check?barcode=1&device=1', $this->user(false))
+            ->assertOk()
+            ->assertJsonMissingPath('url')
+            ->assertJson(['ok' => true]);
+    }
+
     public function test_list_takes_several_addresses_and_ranges(): void
     {
         $user = $this->user(true, "192.0.2.1\n203.0.113.0/24");

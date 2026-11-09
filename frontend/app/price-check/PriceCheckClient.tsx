@@ -9,10 +9,9 @@ import AuthGuard from "../components/AuthGuard";
 import {
   USER_MANUAL_ALLOWED_KEY,
   USER_MANUAL_TEXT_ALLOWED_KEY,
-  API_BASE,
-  authFetch,
   loadErrorText,
 } from "../lib/auth";
+import { fetchDeviceReport } from "../lib/device";
 
 // 1C returns { Barcode, ItemID, ItemName, Price, Stock }; ItemName, Price and Stock are shown.
 // Stock is either a single number or broken down by warehouse, in one of these shapes:
@@ -247,9 +246,9 @@ export default function PriceCheckClient() {
     setResult(undefined);
     setLoading(true);
     try {
-      const data = await authFetch<unknown>(
-        `${API_BASE}/price-check?barcode=${encodeURIComponent(code)}`,
-        { signal: controller.signal },
+      const data = await fetchDeviceReport<unknown>(
+        `price-check?barcode=${encodeURIComponent(code)}`,
+        controller.signal,
       );
       if (controller.signal.aborted) return;
       setResult(data ?? null);
