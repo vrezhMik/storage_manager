@@ -95,12 +95,14 @@ class NetworkRestrictionTest extends TestCase
         $this->getFrom(self::OFFICE, '/api/price-check?barcode=12%2034&device=1', $user)
             ->assertOk()
             ->assertJsonPath('url', 'http://1c.test/price?Barcode=12%2034')
+            ->assertJsonPath('headers.Accept', '*/*')
             ->assertJsonPath('headers.Authorization', 'Basic '.base64_encode('terminal:secret'));
 
         $user->dbEntry->update(['api_price_check' => 'http://1c.test/price?Barcode=']);
 
         $this->getFrom(self::OFFICE, '/api/price-check?barcode=5&device=1', $user->fresh())
-            ->assertJsonPath('url', 'http://1c.test/price?Barcode=5');
+            ->assertJsonPath('url', 'http://1c.test/price?Barcode=5')
+            ->assertJsonPath('headers.Accept', '*/*');
         Http::assertNothingSent();
     }
 

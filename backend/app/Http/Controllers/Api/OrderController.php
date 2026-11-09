@@ -138,7 +138,7 @@ class OrderController extends Controller
             $dbEntry = $request->user()->dbEntry;
 
             if ($this->runsOnDevice($request, 'price check')) {
-                return $this->deviceRequest($dbEntry, $endpoint.rawurlencode($barcode));
+                return $this->deviceRequest($dbEntry, $endpoint.rawurlencode($barcode), self::PRICE_CHECK_ACCEPT);
             }
 
             $response = Http::withBasicAuth($dbEntry->username, $dbEntry->password)
@@ -393,6 +393,9 @@ class OrderController extends Controller
     // Reports the Flexit apps may call from the device itself (?device=1).
     private const DEVICE_TYPES = ['retail plan', 'retail suppliers'];
 
+    // 1C answered 406 to the device's Accept: application/json on Price, and JSON to a browser.
+    private const PRICE_CHECK_ACCEPT = '*/*';
+
     // Price check goes through the device only for users kept inside the company network.
     private function runsOnDevice(Request $request, string $type): bool
     {
@@ -402,13 +405,13 @@ class OrderController extends Controller
         );
     }
 
-    private function deviceRequest(DbEntry $dbEntry, string $url): Response
+    private function deviceRequest(DbEntry $dbEntry, string $url, string $accept): Response
     {
         return response()->json([
             'url' => $url,
             'headers' => [
                 'Authorization' => 'Basic '.base64_encode($dbEntry->username.':'.$dbEntry->password),
-                'Accept' => 'application/json',
+                'Accept' => $accept,
             ],
         ])->header('Cache-Control', 'no-store');
     }
@@ -468,7 +471,11 @@ class OrderController extends Controller
         // itself, so 1C sees the device's IP. It gets the ready request; the
         // store and dates are still decided here, from the user's account.
         if ($this->runsOnDevice($request, $type)) {
-            return $this->deviceRequest($dbEntry, $baseUrl.'?'.http_build_query($mergedQuery, '', '&', PHP_QUERY_RFC3986));
+            return $this->deviceRequest(
+                $dbEntry,
+                $baseUrl.'?'.http_build_query($mergedQuery, '', '&', PHP_QUERY_RFC3986),
+                $type === 'price check' ? self::PRICE_CHECK_ACCEPT : 'application/json',
+            );
         }
 
         $response = Http::withBasicAuth($dbEntry->username, $dbEntry->password)
