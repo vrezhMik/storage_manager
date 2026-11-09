@@ -255,7 +255,9 @@ export default function PriceCheckClient() {
     } catch (err: any) {
       if (controller.signal.aborted || err?.name === "AbortError") return;
       setResult(null);
-      setManualError(loadErrorText(err));
+      // The reason is on screen until the device route to 1C is confirmed working.
+      const reason = String(err?.message ?? err).slice(0, 240);
+      setManualError(reason.includes("network_restricted") ? loadErrorText(err) : `${loadErrorText(err)} · ${reason}`);
       console.error("Price check failed", err);
     } finally {
       if (!controller.signal.aborted) setLoading(false);
