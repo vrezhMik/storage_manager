@@ -79,6 +79,10 @@ class UserResource extends Resource
                     Forms\Components\Checkbox::make('can_sales')
                         ->label('Վաճառքներ (Sales, e-invoicing)')
                         ->default(false),
+                    Forms\Components\Checkbox::make('network_restricted')
+                        ->label('Միայն կազմակերպության ցանցից')
+                        ->helperText('Մանրածախ և Գնի հարցում բաժինները կբացվեն միայն DB Config-ի Allowed IPs հասցեներից։')
+                        ->default(false),
                     Forms\Components\TextInput::make('cosign_username')
                         ->label('CoSign login (e-signature)')
                         ->helperText('E-invoicing signing: fill in ONE of CoSign, Mobile ID or Nikita (this person\'s own). CoSign is used first if several are filled.')

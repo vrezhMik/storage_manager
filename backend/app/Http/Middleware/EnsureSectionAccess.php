@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -19,6 +20,20 @@ class EnsureSectionAccess
         if (! $user || ! $user->canUseSection($section)) {
             return response()->json([
                 'message' => 'This section is not available for this user',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        if ($user->isOutsideNetwork($section, $request->ip())) {
+            Log::warning('Terminal section refused outside the company network', [
+                'user' => $user->id,
+                'section' => $section,
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'code' => 'network_restricted',
+                'message' => 'This section is available only from the company network',
+                'ip' => $request->ip(),
             ], Response::HTTP_FORBIDDEN);
         }
 

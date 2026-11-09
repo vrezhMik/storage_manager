@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Symfony\Component\HttpFoundation\IpUtils;
 
 class DbEntry extends Model
 {
@@ -28,6 +29,7 @@ class DbEntry extends Model
         'api_sales_monthly',
         'api_retail_plan',
         'api_retail_suppliers',
+        'allowed_ips',
         'einvoice_tin',
         'einvoice_login',
         'einvoice_password',
@@ -72,5 +74,16 @@ class DbEntry extends Model
             'test', 'live' => filled($this->ehdm_crn) && filled($this->ehdm_cert),
             default => false,
         };
+    }
+
+    /**
+     * Whether a request's IP is in the company's network (allowed_ips: IPs or
+     * ranges like 203.0.113.0/24). An empty list allows nobody.
+     */
+    public function allowsIp(?string $ip): bool
+    {
+        $allowed = preg_split('/[\s,;]+/', (string) $this->allowed_ips, -1, PREG_SPLIT_NO_EMPTY);
+
+        return $ip !== null && IpUtils::checkIp($ip, $allowed);
     }
 }

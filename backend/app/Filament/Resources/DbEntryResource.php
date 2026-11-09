@@ -105,6 +105,11 @@ class DbEntryResource extends Resource
                 ->label('API: Retail Suppliers')
                 ->helperText('Date (DD.MM.YYYY), Days and the user\'s Store are filled in, e.g. http://host:port/terminal/hs/Eportal/RetailSuppliers?Date=')
                 ->maxLength(255),
+            Forms\Components\Textarea::make('allowed_ips')
+                ->label('Allowed IPs (company network)')
+                ->helperText('The company\'s public IPs, one per line (ranges like 203.0.113.0/24 work). For users marked "Միայն կազմակերպության ցանցից". Empty = those users are refused.')
+                ->regex('/^[\da-fA-F.:\/\s,;]*$/')
+                ->rows(3),
             Forms\Components\TextInput::make('einvoice_tin')
                 ->label('E-invoicing: ՀՎՀՀ (TIN)')
                 ->helperText('The company\'s 8-digit TIN in e-invoicing.taxservice.am')

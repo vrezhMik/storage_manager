@@ -11,6 +11,7 @@ import {
   USER_MANUAL_TEXT_ALLOWED_KEY,
   API_BASE,
   authFetch,
+  loadErrorText,
 } from "../lib/auth";
 
 // 1C returns { Barcode, ItemID, ItemName, Price, Stock }; ItemName, Price and Stock are shown.
@@ -255,7 +256,7 @@ export default function PriceCheckClient() {
     } catch (err: any) {
       if (controller.signal.aborted || err?.name === "AbortError") return;
       setResult(null);
-      setManualError("Չհաջողվեց ստանալ տվյալները");
+      setManualError(loadErrorText(err));
       console.error("Price check failed", err);
     } finally {
       if (!controller.signal.aborted) setLoading(false);

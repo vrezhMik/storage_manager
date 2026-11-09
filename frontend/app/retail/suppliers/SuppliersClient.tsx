@@ -5,6 +5,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthGuard from "../../components/AuthGuard";
+import { loadErrorText } from "../../lib/auth";
 import { formatDisplayDate } from "../../reports/components/DateRangeModal";
 import {
   buildSuppliers,
@@ -168,7 +169,7 @@ export default function SuppliersClient() {
       .then((d) => alive && setData(d))
       .catch((err) => {
         console.error("Suppliers failed", err);
-        if (alive) setError("Չհաջողվեց ստանալ տվյալները");
+        if (alive) setError(loadErrorText(err));
       })
       .finally(() => alive && setLoading(false));
     return () => {

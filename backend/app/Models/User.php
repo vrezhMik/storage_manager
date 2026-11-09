@@ -37,6 +37,7 @@ class User extends Authenticatable implements FilamentUser
         'can_retail',
         'retail_store',
         'can_sales',
+        'network_restricted',
         'cosign_username',
         'cosign_password',
         'mobile_id_phone',
@@ -62,6 +63,11 @@ class User extends Authenticatable implements FilamentUser
      * Sections that stay hidden when their column has no value yet.
      */
     private const SECTIONS_OFF_BY_DEFAULT = ['dashboard', 'assistant', 'retail', 'sales'];
+
+    /**
+     * Sections a network_restricted user opens only from the company's network.
+     */
+    private const NETWORK_SECTIONS = ['retail', 'price_check'];
 
     protected $appends = ['sections'];
 
@@ -97,6 +103,7 @@ class User extends Authenticatable implements FilamentUser
             'can_assistant' => 'boolean',
             'can_retail' => 'boolean',
             'can_sales' => 'boolean',
+            'network_restricted' => 'boolean',
         ];
     }
 
@@ -118,6 +125,13 @@ class User extends Authenticatable implements FilamentUser
     public function canUseSection(string $section): bool
     {
         return $this->sections[$section] ?? false;
+    }
+
+    public function isOutsideNetwork(string $section, ?string $ip): bool
+    {
+        return $this->network_restricted
+            && in_array($section, self::NETWORK_SECTIONS, true)
+            && ! $this->dbEntry?->allowsIp($ip);
     }
 
     /**

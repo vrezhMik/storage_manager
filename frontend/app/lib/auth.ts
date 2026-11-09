@@ -49,6 +49,15 @@ const API_BASE =
   "https://admin.flexit.am/api";
 export { API_BASE };
 
+// What a page shows when its data can't be loaded. The server refuses marked
+// users outside the company network (code network_restricted) and names their IP.
+export function loadErrorText(err: unknown): string {
+  const text = err instanceof Error ? err.message : "";
+  if (!text.includes('"network_restricted"')) return "Չհաջողվեց ստանալ տվյալները";
+  const ip = text.match(/"ip":"([^"]+)"/)?.[1];
+  return `Այս բաժինը հասանելի է միայն կազմակերպության ցանցից։ Միացեք խանութի Wi-Fi-ին։${ip ? ` (Ձեր IP՝ ${ip})` : ""}`;
+}
+
 export function storeAuthTokens(data: {
   user?: {
     email?: string;

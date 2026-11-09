@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import type { Route } from "next";
 import Link from "next/link";
 import AuthGuard from "../components/AuthGuard";
+import { loadErrorText } from "../lib/auth";
 import { fetchDeviceReport } from "../lib/device";
 import { formatDisplayDate } from "../reports/components/DateRangeModal";
 import { formatAmount, toNumber } from "../reports/sales/salesData";
@@ -397,7 +398,7 @@ export default function RetailClient() {
       .catch((err: any) => {
         if (controller.signal.aborted || err?.name === "AbortError") return;
         console.error("Retail plan failed", err);
-        setError("Չհաջողվեց ստանալ տվյալները");
+        setError(loadErrorText(err));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);

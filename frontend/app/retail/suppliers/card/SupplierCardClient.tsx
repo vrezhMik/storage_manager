@@ -5,6 +5,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AuthGuard from "../../../components/AuthGuard";
+import { loadErrorText } from "../../../lib/auth";
 import { formatDisplayDate } from "../../../reports/components/DateRangeModal";
 import { formatAmount, tdClass, thClass } from "../../../reports/sales/salesData";
 import { LateBadge } from "../SuppliersClient";
@@ -175,7 +176,7 @@ export default function SupplierCardClient() {
       .then((d) => alive && setData(d))
       .catch((err) => {
         console.error("Supplier card failed", err);
-        if (alive) setError("Չհաջողվեց ստանալ տվյալները");
+        if (alive) setError(loadErrorText(err));
       });
     return () => {
       alive = false;
