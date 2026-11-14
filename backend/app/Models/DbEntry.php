@@ -30,6 +30,8 @@ class DbEntry extends Model
         'api_retail_plan',
         'api_retail_suppliers',
         'allowed_ips',
+        'catalog_url',
+        'api_stock',
         'einvoice_tin',
         'einvoice_login',
         'einvoice_password',

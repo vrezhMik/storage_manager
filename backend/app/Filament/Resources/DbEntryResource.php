@@ -105,6 +105,15 @@ class DbEntryResource extends Resource
                 ->label('API: Retail Suppliers')
                 ->helperText('Date (DD.MM.YYYY), Days and the user\'s Store are filled in, e.g. http://host:port/terminal/hs/Eportal/RetailSuppliers?Date=')
                 ->maxLength(255),
+            Forms\Components\TextInput::make('catalog_url')
+                ->label('Catalog site (WooCommerce)')
+                ->helperText('The company\'s shop site, e.g. https://shinmall.am. Groups, names, prices and pictures for the Sales product picker come from it; each product\'s SKU must be its 1C code.')
+                ->url()
+                ->maxLength(255),
+            Forms\Components\TextInput::make('api_stock')
+                ->label('API: Stock by codes')
+                ->helperText('Codes (comma separated 1C codes) is added, e.g. http://host:port/terminal/hs/Eportal/Stock. Answer: [{"Code","Stock","Unit","ClassifierCode"}].')
+                ->maxLength(255),
             Forms\Components\Textarea::make('allowed_ips')
                 ->label('Allowed IPs (company network)')
                 ->helperText('The company\'s public IPs, one per line (ranges like 203.0.113.0/24 work). For users marked "Միայն կազմակերպության ցանցից". Empty = those users are refused.')

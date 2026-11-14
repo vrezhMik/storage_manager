@@ -8,6 +8,7 @@ import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatAmount } from "../../reports/sales/salesData";
 import { createDraftOnDevice, startSigningOnDevice } from "../einvoiceDevice";
+import ProductPicker, { PickedLine } from "./ProductPicker";
 import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, hasSrcExtension, nativeBridge, SrcSessionError, srcFetch, TYPE_LABELS } from "../salesShared";
 
 // The form for a new account document (հաշիվ-վավերագիր): saved in e-invoicing
@@ -43,6 +44,7 @@ export function SalesFormView() {
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [signMethod, setSignMethod] = useState<SignMethod | null>(null);
+  const [picking, setPicking] = useState(false);
   const canSign = signMethod !== null;
 
   const goods = type === "ACC_DOC_GOODS";
@@ -89,6 +91,22 @@ export function SalesFormView() {
   };
 
   const updateRow = (i: number, patch: Partial<Row>) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+
+  // Products picked from the catalog replace the untouched empty rows.
+  const addPicked = (lines: PickedLine[]) => {
+    const blank = (r: Row) => !r.name.trim() && !r.classifierCode.trim() && !r.quantity.trim() && !r.unitPrice.trim();
+    setRows((prev) => [
+      ...prev.filter((r) => !blank(r)),
+      ...lines.map((l) => ({
+        name: l.item.name,
+        classifierCode: l.info?.classifierCode ?? "",
+        unit: l.info?.unit || "հատ",
+        quantity: String(l.quantity),
+        unitPrice: l.item.price != null ? String(l.item.price) : "",
+      })),
+    ]);
+    setPicking(false);
+  };
 
   const problems = [
     !/^\d{8}$/.test(buyerTin) && "Գնորդի ՀՎՀՀ-ն (8 թիվ)",
@@ -279,9 +297,20 @@ export function SalesFormView() {
                 ))}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                <button type="button" onClick={() => setRows((prev) => [...prev, emptyRow()])} className="text-sm font-medium text-primary hover:underline">
-                  + Ավելացնել տող
-                </button>
+                <div className="flex flex-wrap items-center gap-4">
+                  {goods && (
+                    <button
+                      type="button"
+                      onClick={() => setPicking(true)}
+                      className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+                    >
+                      📦 Ընտրել ապրանքացանկից
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setRows((prev) => [...prev, emptyRow()])} className="text-sm font-medium text-primary hover:underline">
+                    + Ավելացնել տող
+                  </button>
+                </div>
                 <span className="text-base">
                   Ընդամենը՝ <b className="tabular-nums">{formatAmount(total)}</b>
                 </span>
@@ -330,6 +359,7 @@ export function SalesFormView() {
           </div>
         </main>
       </div>
+      {picking && <ProductPicker onClose={() => setPicking(false)} onAdd={addPicked} />}
     </>
   );
 }

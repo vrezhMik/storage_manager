@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\EhdmController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SalesController;
@@ -32,6 +33,8 @@ Route::middleware(['auth.jwt', 'section:retail'])->get('retail-suppliers', [Orde
 Route::middleware(['auth.jwt', 'section:sales'])->prefix('sales')->group(function (): void {
     Route::get('taxpayer', [SalesController::class, 'taxpayer']);
     Route::get('device-login', [SalesController::class, 'deviceLogin']);
+    Route::get('catalog', [CatalogController::class, 'index']);
+    Route::get('stock', [CatalogController::class, 'stock']);
     Route::get('documents', [SalesController::class, 'documents']);
     Route::post('documents', [SalesController::class, 'store']);
     Route::post('documents/{document}/sign', [SalesController::class, 'sign']);
