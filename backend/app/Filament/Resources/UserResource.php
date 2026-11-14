@@ -112,6 +112,10 @@ class UserResource extends Resource
                         ->label('Retail store (Խանութ)')
                         ->helperText('Store (warehouse) name exactly as in 1C. The user sees only this store. Empty = all stores.')
                         ->maxLength(255),
+                    Forms\Components\TextInput::make('partners_manager')
+                        ->label('1C manager (Վաճառքների գործընկերներ)')
+                        ->helperText('The user\'s name exactly as in 1C ("Основной менеджер" of partners). The buyer list shows only their partners. Empty = all partners.')
+                        ->maxLength(255),
                 ]),
             Forms\Components\Select::make('db_entry_id')
                 ->label('DB Config')

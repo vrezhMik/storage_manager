@@ -114,6 +114,10 @@ class DbEntryResource extends Resource
                 ->label('API: Stock by codes')
                 ->helperText('Codes (comma separated 1C codes) is added, e.g. http://host:port/terminal/hs/Eportal/Stock. Answer: [{"Code","Stock","Unit","ClassifierCode"}].')
                 ->maxLength(255),
+            Forms\Components\TextInput::make('api_partners')
+                ->label('API: Partners')
+                ->helperText('Manager (the user\'s "1C manager") is added when set, e.g. http://host:port/terminal/hs/Eportal/Partners. Answer: [{"TIN","Name","Address"}].')
+                ->maxLength(255),
             Forms\Components\Textarea::make('allowed_ips')
                 ->label('Allowed IPs (company network)')
                 ->helperText('The company\'s public IPs, one per line (ranges like 203.0.113.0/24 work). For users marked "Միայն կազմակերպության ցանցից". Empty = those users are refused.')

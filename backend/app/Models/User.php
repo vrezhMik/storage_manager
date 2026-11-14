@@ -36,6 +36,7 @@ class User extends Authenticatable implements FilamentUser
         'can_assistant',
         'can_retail',
         'retail_store',
+        'partners_manager',
         'can_sales',
         'network_restricted',
         'cosign_username',

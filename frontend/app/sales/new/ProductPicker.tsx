@@ -23,15 +23,25 @@ const buzz = (ms: number) => navigator.vibrate?.(ms);
 
 type Gesture = { code: string; x: number; y: number; start: number; held: boolean; moved: boolean; timer: number };
 
-export default function ProductPicker({ onClose, onAdd }: { onClose: () => void; onAdd: (lines: PickedLine[]) => void }) {
+export default function ProductPicker({
+  initial,
+  onClose,
+  onAdd,
+}: {
+  initial: PickedLine[];
+  onClose: () => void;
+  onAdd: (lines: PickedLine[]) => void;
+}) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState<number | null>(null);
   const [limit, setLimit] = useState(PAGE);
-  const [qty, setQty] = useState<Record<string, number>>({});
-  const [stock, setStock] = useState<Record<string, StockInfo>>({});
+  const [qty, setQty] = useState<Record<string, number>>(() => Object.fromEntries(initial.map((l) => [l.item.code || l.item.name, l.quantity])));
+  const [stock, setStock] = useState<Record<string, StockInfo>>(() =>
+    Object.fromEntries(initial.filter((l) => l.item.code && l.info).map((l) => [l.item.code, l.info as StockInfo])),
+  );
   const [stockError, setStockError] = useState(false);
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [draft, setDraft] = useState("");
@@ -171,7 +181,7 @@ export default function ProductPicker({ onClose, onAdd }: { onClose: () => void;
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-card">
       <div className="space-y-2 border-b p-3">
         <div className="flex items-center gap-2">
           <h3 className="flex-1 text-lg font-semibold text-foreground">Ապրանքացանկ</h3>
@@ -279,7 +289,7 @@ export default function ProductPicker({ onClose, onAdd }: { onClose: () => void;
       </div>
 
       {slidingItem && (
-        <div className="pointer-events-none fixed left-1/2 top-1/3 z-[70] -translate-x-1/2 rounded-2xl bg-black/80 px-6 py-4 text-center text-white">
+        <div className="pointer-events-none fixed left-1/2 top-1/3 z-[120] -translate-x-1/2 rounded-2xl bg-black/80 px-6 py-4 text-center text-white">
           <p className="max-w-[16rem] truncate text-xs opacity-80">{slidingItem.name}</p>
           <p className="text-4xl font-bold tabular-nums">{formatAmount(qty[keyOf(slidingItem)] ?? 0)}</p>
         </div>
@@ -292,17 +302,17 @@ export default function ProductPicker({ onClose, onAdd }: { onClose: () => void;
         </div>
         <button
           type="button"
-          disabled={picked.length === 0}
+          disabled={picked.length === 0 && initial.length === 0}
           onClick={() => onAdd(picked.map((p) => ({ ...p, info: p.item.code ? stock[p.item.code] ?? null : null })))}
           className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50"
         >
-          Ավելացնել
+          Պատրաստ
         </button>
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setEditing(null)}>
-          <div className="w-full max-w-sm space-y-3 rounded-t-2xl bg-background p-4 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setEditing(null)}>
+          <div className="w-full max-w-sm space-y-3 rounded-t-2xl bg-card p-4 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <p className="text-sm font-medium text-foreground">{editing.name}</p>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setDraft(String(Math.max(0, num(draft) - 1)))} className="h-12 w-12 rounded-md border text-xl">

@@ -14,8 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 /**
- * The Sales product picker: the catalog from the company's site and the
- * stock of the shown products from 1C.
+ * The Sales pickers: the catalog from the company's site, the stock of the
+ * shown products and the partners from 1C.
  */
 class CatalogController extends Controller
 {
@@ -80,8 +80,31 @@ class CatalogController extends Controller
             return response()->json(['message' => 'No stock endpoint set up in the admin panel (DB entries)'], Response::HTTP_BAD_REQUEST);
         }
 
-        $url = $entry->api_stock.(str_contains($entry->api_stock, '?') ? '&' : '?')
-            .http_build_query(['Codes' => implode(',', $codes)], '', '&', PHP_QUERY_RFC3986);
+        return $this->ask1c($request, $entry, $entry->api_stock, ['Codes' => implode(',', $codes)], 'stock');
+    }
+
+    /**
+     * The company's partners from 1C: [{TIN, Name, Address}]. A user with
+     * "1C manager" set gets only the partners whose main manager they are.
+     */
+    public function partners(Request $request): Response
+    {
+        $entry = $request->user()?->dbEntry;
+        if (! $entry || blank($entry->api_partners)) {
+            return response()->json(['message' => 'No partners endpoint set up in the admin panel (DB entries)'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $manager = trim((string) $request->user()->partners_manager);
+
+        return $this->ask1c($request, $entry, $entry->api_partners, $manager !== '' ? ['Manager' => $manager] : [], 'partners');
+    }
+
+    // Users kept inside the company network get the request to send from
+    // their device (?device=1), as in Retail; the others get 1C's answer.
+    private function ask1c(Request $request, DbEntry $entry, string $endpoint, array $query, string $what): Response
+    {
+        $url = $query === [] ? $endpoint : $endpoint.(str_contains($endpoint, '?') ? '&' : '?')
+            .http_build_query($query, '', '&', PHP_QUERY_RFC3986);
 
         if ($request->boolean('device') && $request->user()->network_restricted) {
             return response()->json($this->deviceRequest($entry, $url))->header('Cache-Control', 'no-store');
@@ -95,7 +118,7 @@ class CatalogController extends Controller
 
         if ($response->failed()) {
             return response()->json([
-                'message' => 'Failed to fetch stock',
+                'message' => 'Failed to fetch '.$what,
                 'status' => $response->status(),
                 'body' => $response->json() ?? $response->body(),
             ], Response::HTTP_BAD_GATEWAY);

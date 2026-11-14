@@ -35,6 +35,31 @@ const toNumber = (v: unknown) => {
   return v === undefined || !Number.isFinite(n) ? null : n;
 };
 
+export type Partner = { tin: string; name: string; address: string };
+
+let partners: Promise<Partner[]> | null = null;
+
+// 1C answers [{TIN, Name, Address}]; read once per visit.
+export const loadPartners = (): Promise<Partner[]> => {
+  if (!partners) {
+    const promise = fetchDeviceReport<unknown>("sales/partners").then((raw) =>
+      (Array.isArray(raw) ? raw : isRecord(raw) && Array.isArray(raw.Items) ? raw.Items : [])
+        .filter(isRecord)
+        .map((row) => ({
+          tin: String(pick(row, ["TIN", "ИНН"]) ?? "").replace(/\D/g, ""),
+          name: String(pick(row, ["Name", "Наименование"]) ?? "").trim(),
+          address: String(pick(row, ["Address", "Адрес"]) ?? "").trim(),
+        }))
+        .filter((p) => p.name || p.tin),
+    );
+    promise.catch(() => {
+      if (partners === promise) partners = null;
+    });
+    partners = promise;
+  }
+  return partners;
+};
+
 // 1C answers [{Code, Stock, Unit, ClassifierCode}] (Russian names are accepted too).
 export const loadStock = async (codes: string[]): Promise<Record<string, StockInfo>> => {
   const raw = await fetchDeviceReport<unknown>(`sales/stock?codes=${encodeURIComponent(codes.join(","))}`);

@@ -35,6 +35,7 @@ Route::middleware(['auth.jwt', 'section:sales'])->prefix('sales')->group(functio
     Route::get('device-login', [SalesController::class, 'deviceLogin']);
     Route::get('catalog', [CatalogController::class, 'index']);
     Route::get('stock', [CatalogController::class, 'stock']);
+    Route::get('partners', [CatalogController::class, 'partners']);
     Route::get('documents', [SalesController::class, 'documents']);
     Route::post('documents', [SalesController::class, 'store']);
     Route::post('documents/{document}/sign', [SalesController::class, 'sign']);

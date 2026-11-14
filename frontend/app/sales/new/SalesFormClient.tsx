@@ -8,13 +8,15 @@ import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatAmount } from "../../reports/sales/salesData";
 import { createDraftOnDevice, startSigningOnDevice } from "../einvoiceDevice";
+import { Partner } from "../catalog";
+import BuyerPicker from "./BuyerPicker";
 import ProductPicker, { PickedLine } from "./ProductPicker";
 import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, hasSrcExtension, nativeBridge, SrcSessionError, srcFetch, TYPE_LABELS } from "../salesShared";
 
 // The form for a new account document (հաշիվ-վավերագիր): saved in e-invoicing
 // as a draft, and signed right away when the user has a signing method.
 
-type Row = { name: string; classifierCode: string; unit: string; quantity: string; unitPrice: string };
+type Row = { name: string; unit: string; quantity: string; unitPrice: string };
 const TYPES = (Object.keys(TYPE_LABELS) as DocType[]).map((type) => ({ type, label: TYPE_LABELS[type] }));
 
 const inputClass =
@@ -24,7 +26,7 @@ const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
-const emptyRow = (): Row => ({ name: "", classifierCode: "", unit: "հատ", quantity: "", unitPrice: "" });
+const emptyRow = (): Row => ({ name: "", unit: "հատ", quantity: "", unitPrice: "" });
 const num = (s: string) => {
   const n = Number(String(s).replace(/\s/g, "").replace(",", "."));
   return Number.isFinite(n) ? n : 0;
@@ -45,10 +47,14 @@ export function SalesFormView() {
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const [signMethod, setSignMethod] = useState<SignMethod | null>(null);
   const [picking, setPicking] = useState(false);
+  const [choosingBuyer, setChoosingBuyer] = useState(false);
+  // Goods come only from the catalog; services are still typed in rows.
+  const [picked, setPicked] = useState<PickedLine[]>([]);
   const canSign = signMethod !== null;
 
   const goods = type === "ACC_DOC_GOODS";
-  const total = rows.reduce((s, r) => s + rowTotal(r), 0);
+  const pickedSum = (p: PickedLine) => Math.round(p.quantity * (p.item.price ?? 0) * 100) / 100;
+  const total = goods ? picked.reduce((s, p) => s + pickedSum(p), 0) : rows.reduce((s, r) => s + rowTotal(r), 0);
 
   // Only to know whether the user can sign (and how).
   useEffect(() => {
@@ -57,24 +63,27 @@ export function SalesFormView() {
       .catch(() => setSignMethod(null));
   }, []);
 
-  const findBuyer = async () => {
-    if (!/^\d{8}$/.test(buyerTin)) {
+  // Fills the buyer from the tax service; true when it was found.
+  const findBuyer = async (tin: string = buyerTin): Promise<boolean> => {
+    if (!/^\d{8}$/.test(tin)) {
       setLookup({ busy: false, error: "ՀՎՀՀ-ն պետք է լինի 8 թիվ" });
-      return;
+      return false;
     }
+    setBuyerTin(tin);
     setLookup({ busy: true, error: null });
     // Asked from this device (its own IP), with the e-invoicing session the
     // employee opened on file-online.taxservice.am.
     try {
-      const answer = await srcFetch("tpinfo/tp-info-by-tin", { tin: buyerTin, checkDate: new Date().toISOString() });
+      const answer = await srcFetch("tpinfo/tp-info-by-tin", { tin, checkDate: new Date().toISOString() });
       const info = (answer.payload ?? null) as Record<string, unknown> | null;
       if (!answer.ok || !info) {
         setLookup({ busy: false, error: answer.failure?.message ?? "Այս ՀՎՀՀ-ով հարկ վճարող չգտնվեց" });
-        return;
+        return false;
       }
       setBuyerName(String(info.name ?? info.taxpayerName ?? ""));
       setBuyerAddress(String(info.address ?? info.legalAddress ?? ""));
       setLookup({ busy: false, error: null });
+      return true;
     } catch (err) {
       setLookup({
         busy: false,
@@ -87,35 +96,35 @@ export function SalesFormView() {
                 : "ՊԵԿ-ի հետ աշխատելու համար բացեք տերմինալը Flexit ծրագրով (Windows կամ Android)։"
             : `ՊԵԿ-ի հետ կապ չստացվեց. ${(err as Error).message}`,
       });
+      return false;
     }
+  };
+
+  const pickBuyer = (p: Partner) => {
+    setBuyerTin(p.tin);
+    setBuyerName(p.name);
+    setBuyerAddress(p.address);
+    setLookup({ busy: false, error: null });
+    setChoosingBuyer(false);
   };
 
   const updateRow = (i: number, patch: Partial<Row>) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
-  // Products picked from the catalog replace the untouched empty rows.
-  const addPicked = (lines: PickedLine[]) => {
-    const blank = (r: Row) => !r.name.trim() && !r.classifierCode.trim() && !r.quantity.trim() && !r.unitPrice.trim();
-    setRows((prev) => [
-      ...prev.filter((r) => !blank(r)),
-      ...lines.map((l) => ({
-        name: l.item.name,
-        classifierCode: l.info?.classifierCode ?? "",
-        unit: l.info?.unit || "հատ",
-        quantity: String(l.quantity),
-        unitPrice: l.item.price != null ? String(l.item.price) : "",
-      })),
-    ]);
-    setPicking(false);
-  };
-
   const problems = [
     !/^\d{8}$/.test(buyerTin) && "Գնորդի ՀՎՀՀ-ն (8 թիվ)",
     !deliveredAt && "Մատակարարման ամսաթիվը",
-    rows.some((r) => !r.name.trim()) && "Բոլոր տողերի անվանումը",
-    goods && rows.some((r) => !r.classifierCode.trim()) && "Բոլոր տողերի ԱՏԳ ԱԱ կոդը",
-    rows.some((r) => !r.unit.trim()) && "Բոլոր տողերի միավորը",
-    rows.some((r) => num(r.quantity) <= 0) && "Բոլոր տողերի քանակը",
-    rows.some((r) => num(r.unitPrice) < 0 || r.unitPrice.trim() === "") && "Բոլոր տողերի գինը",
+    ...(goods
+      ? [
+          picked.length === 0 && "Ապրանքները (ապրանքացանկից)",
+          picked.some((p) => !p.info?.classifierCode) && "ԱՏԳ ԱԱ կոդը 1C-ում (կարմիրով նշված ապրանքների)",
+          picked.some((p) => p.item.price == null) && "Գինը կայքում (կարմիրով նշված ապրանքների)",
+        ]
+      : [
+          rows.some((r) => !r.name.trim()) && "Բոլոր տողերի անվանումը",
+          rows.some((r) => !r.unit.trim()) && "Բոլոր տողերի միավորը",
+          rows.some((r) => num(r.quantity) <= 0) && "Բոլոր տողերի քանակը",
+          rows.some((r) => num(r.unitPrice) < 0 || r.unitPrice.trim() === "") && "Բոլոր տողերի գինը",
+        ]),
   ].filter(Boolean) as string[];
 
   const send = async (sign: boolean) => {
@@ -130,13 +139,21 @@ export function SalesFormView() {
       buyerAddress: buyerAddress || null,
       deliveredAt,
       additionalInfo: additionalInfo || null,
-      items: rows.map((r) => ({
-        name: r.name.trim(),
-        classifierCode: goods ? r.classifierCode.trim() : null,
-        unit: r.unit.trim(),
-        quantity: num(r.quantity),
-        unitPrice: num(r.unitPrice),
-      })),
+      items: goods
+        ? picked.map((p) => ({
+            name: p.item.name,
+            classifierCode: p.info?.classifierCode ?? "",
+            unit: p.info?.unit || "հատ",
+            quantity: p.quantity,
+            unitPrice: p.item.price ?? 0,
+          }))
+        : rows.map((r) => ({
+            name: r.name.trim(),
+            classifierCode: null,
+            unit: r.unit.trim(),
+            quantity: num(r.quantity),
+            unitPrice: num(r.unitPrice),
+          })),
     };
     try {
       if (nativeBridge()) {
@@ -213,7 +230,16 @@ export function SalesFormView() {
             </div>
 
             <div className={`${cardClass} space-y-3`}>
-              <h3 className="font-semibold text-foreground">Գնորդ</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-foreground">Գնորդ</h3>
+                <button
+                  type="button"
+                  onClick={() => setChoosingBuyer(true)}
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+                >
+                  👥 Ընտրել գործընկերներից
+                </button>
+              </div>
               <div className="grid gap-3 md:grid-cols-[12rem_auto_1fr]">
                 <input
                   value={buyerTin}
@@ -226,7 +252,7 @@ export function SalesFormView() {
                 />
                 <button
                   type="button"
-                  onClick={findBuyer}
+                  onClick={() => findBuyer()}
                   disabled={lookup.busy}
                   className="rounded-md border border-input px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
                 >
@@ -250,67 +276,92 @@ export function SalesFormView() {
 
             <div className={`${cardClass} space-y-3`}>
               <h3 className="font-semibold text-foreground">{goods ? "Ապրանքներ" : "Ծառայություններ"}</h3>
-              <div className="space-y-3">
-                <div className="hidden gap-2 text-xs font-semibold text-muted-foreground md:grid md:grid-cols-[2rem_1fr_9rem_6rem_6rem_8rem_8rem_2rem]">
-                  <span>#</span>
-                  <span>Անվանում</span>
-                  <span>{goods ? "ԱՏԳ ԱԱ կոդ" : ""}</span>
-                  <span>Միավոր</span>
-                  <span>Քանակ</span>
-                  <span>Գին</span>
-                  <span className="text-right">Գումար</span>
-                  <span />
+              {goods ? (
+                <div className="space-y-2">
+                  {picked.length === 0 && <p className="text-sm text-muted-foreground">Ապրանքներն ընտրեք ապրանքացանկից։</p>}
+                  {picked.map((p) => {
+                    const missing = !p.info?.classifierCode || p.item.price == null;
+                    return (
+                      <div
+                        key={p.item.code || p.item.name}
+                        className={`flex items-center gap-3 rounded-lg border p-2 ${missing ? "border-red-300 bg-red-50" : ""}`}
+                      >
+                        {p.item.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.item.image} alt="" className="h-12 w-12 shrink-0 rounded-md bg-muted object-cover" />
+                        ) : (
+                          <div className="h-12 w-12 shrink-0 rounded-md bg-muted" />
+                        )}
+                        <button type="button" onClick={() => setPicking(true)} className="min-w-0 flex-1 text-left">
+                          <p className="line-clamp-2 text-sm font-medium">{p.item.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatAmount(p.quantity)} {p.info?.unit || "հատ"} × {p.item.price != null ? formatAmount(p.item.price) : "գին չկա"}
+                            {!p.info?.classifierCode && <span className="text-red-700"> · ԱՏԳ ԱԱ կոդ չկա 1C-ում</span>}
+                          </p>
+                        </button>
+                        <span className="text-sm font-semibold tabular-nums">{formatAmount(pickedSum(p))}</span>
+                        <button
+                          type="button"
+                          onClick={() => setPicked((prev) => prev.filter((x) => x !== p))}
+                          className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-red-50 hover:text-red-700"
+                          aria-label="Հանել"
+                          title="Հանել"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
-                {rows.map((r, i) => (
-                  <div key={i} className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[2rem_1fr_9rem_6rem_6rem_8rem_8rem_2rem] md:items-center md:border-0 md:p-0">
-                    <span className="hidden text-sm text-muted-foreground md:block">{i + 1}.</span>
-                    <input value={r.name} onChange={(e) => updateRow(i, { name: e.target.value })} placeholder="Անվանում" className={inputClass} aria-label="Անվանում" />
-                    {goods ? (
-                      <input
-                        value={r.classifierCode}
-                        onChange={(e) => updateRow(i, { classifierCode: e.target.value.replace(/\s/g, "") })}
-                        placeholder="ԱՏԳ ԱԱ կոդ"
-                        inputMode="numeric"
-                        className={inputClass}
-                        aria-label="ԱՏԳ ԱԱ կոդ"
-                      />
-                    ) : (
-                      <span className="hidden md:block" />
-                    )}
-                    <input value={r.unit} onChange={(e) => updateRow(i, { unit: e.target.value })} placeholder="Միավոր" className={inputClass} aria-label="Միավոր" />
-                    <input value={r.quantity} onChange={(e) => updateRow(i, { quantity: e.target.value })} placeholder="Քանակ" inputMode="decimal" className={inputClass} aria-label="Քանակ" />
-                    <input value={r.unitPrice} onChange={(e) => updateRow(i, { unitPrice: e.target.value })} placeholder="Գին" inputMode="decimal" className={inputClass} aria-label="Գին" />
-                    <span className="text-right text-sm font-semibold tabular-nums">
-                      <span className="mr-1 font-normal text-muted-foreground md:hidden">Գումար՝</span>
-                      {formatAmount(rowTotal(r))}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [emptyRow()]))}
-                      className="justify-self-end rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-red-50 hover:text-red-700"
-                      aria-label="Ջնջել տողը"
-                      title="Ջնջել տողը"
-                    >
-                      ✕
-                    </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="hidden gap-2 text-xs font-semibold text-muted-foreground md:grid md:grid-cols-[2rem_1fr_6rem_6rem_8rem_8rem_2rem]">
+                    <span>#</span>
+                    <span>Անվանում</span>
+                    <span>Միավոր</span>
+                    <span>Քանակ</span>
+                    <span>Գին</span>
+                    <span className="text-right">Գումար</span>
+                    <span />
                   </div>
-                ))}
-              </div>
+                  {rows.map((r, i) => (
+                    <div key={i} className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[2rem_1fr_6rem_6rem_8rem_8rem_2rem] md:items-center md:border-0 md:p-0">
+                      <span className="hidden text-sm text-muted-foreground md:block">{i + 1}.</span>
+                      <input value={r.name} onChange={(e) => updateRow(i, { name: e.target.value })} placeholder="Անվանում" className={inputClass} aria-label="Անվանում" />
+                      <input value={r.unit} onChange={(e) => updateRow(i, { unit: e.target.value })} placeholder="Միավոր" className={inputClass} aria-label="Միավոր" />
+                      <input value={r.quantity} onChange={(e) => updateRow(i, { quantity: e.target.value })} placeholder="Քանակ" inputMode="decimal" className={inputClass} aria-label="Քանակ" />
+                      <input value={r.unitPrice} onChange={(e) => updateRow(i, { unitPrice: e.target.value })} placeholder="Գին" inputMode="decimal" className={inputClass} aria-label="Գին" />
+                      <span className="text-right text-sm font-semibold tabular-nums">
+                        <span className="mr-1 font-normal text-muted-foreground md:hidden">Գումար՝</span>
+                        {formatAmount(rowTotal(r))}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRows((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [emptyRow()]))}
+                        className="justify-self-end rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-red-50 hover:text-red-700"
+                        aria-label="Ջնջել տողը"
+                        title="Ջնջել տողը"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-                <div className="flex flex-wrap items-center gap-4">
-                  {goods && (
-                    <button
-                      type="button"
-                      onClick={() => setPicking(true)}
-                      className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
-                    >
-                      📦 Ընտրել ապրանքացանկից
-                    </button>
-                  )}
+                {goods ? (
+                  <button
+                    type="button"
+                    onClick={() => setPicking(true)}
+                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+                  >
+                    📦 {picked.length > 0 ? "Փոխել ընտրությունը" : "Ընտրել ապրանքացանկից"}
+                  </button>
+                ) : (
                   <button type="button" onClick={() => setRows((prev) => [...prev, emptyRow()])} className="text-sm font-medium text-primary hover:underline">
                     + Ավելացնել տող
                   </button>
-                </div>
+                )}
                 <span className="text-base">
                   Ընդամենը՝ <b className="tabular-nums">{formatAmount(total)}</b>
                 </span>
@@ -359,7 +410,18 @@ export function SalesFormView() {
           </div>
         </main>
       </div>
-      {picking && <ProductPicker onClose={() => setPicking(false)} onAdd={addPicked} />}
+      {choosingBuyer && (
+        <BuyerPicker
+          onClose={() => setChoosingBuyer(false)}
+          onPick={pickBuyer}
+          onFind={async (tin) => {
+            if (await findBuyer(tin)) setChoosingBuyer(false);
+          }}
+          finding={lookup.busy}
+          findError={lookup.error}
+        />
+      )}
+      {picking && <ProductPicker initial={picked} onClose={() => setPicking(false)} onAdd={(lines) => { setPicked(lines); setPicking(false); }} />}
     </>
   );
 }

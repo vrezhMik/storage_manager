@@ -165,6 +165,24 @@ class CatalogTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_partners_come_from_1c_filtered_by_the_users_manager(): void
+    {
+        Http::fake(['1c.test/*' => Http::response([['TIN' => '01234567', 'Name' => 'Ռուբեն', 'Address' => 'Երևան']])]);
+        $user = $this->user(['api_partners' => 'http://1c.test/terminal/hs/Eportal/Partners']);
+
+        $this->asUser($user, '/api/sales/partners')->assertOk()->assertJsonPath('0.TIN', '01234567');
+        Http::assertSent(fn (Request $r) => $r->url() === 'http://1c.test/terminal/hs/Eportal/Partners');
+
+        $user->update(['partners_manager' => 'Արամ Պետրոսյան']);
+        $this->asUser($user->fresh(), '/api/sales/partners')->assertOk();
+        Http::assertSent(fn (Request $r) => $r->url() === 'http://1c.test/terminal/hs/Eportal/Partners?Manager=%D4%B1%D6%80%D5%A1%D5%B4%20%D5%8A%D5%A5%D5%BF%D6%80%D5%B8%D5%BD%D5%B5%D5%A1%D5%B6');
+    }
+
+    public function test_partners_need_an_endpoint(): void
+    {
+        $this->asUser($this->user(), '/api/sales/partners')->assertStatus(400);
+    }
+
     public function test_stock_needs_codes_and_an_endpoint(): void
     {
         $user = $this->user();
