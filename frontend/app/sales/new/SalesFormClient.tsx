@@ -368,10 +368,10 @@ export function SalesFormView() {
               </div>
             </div>
 
+            {/* The buttons appear once the buyer and the goods are filled in. */}
+            {(problems.length === 0 || result) && (
             <div className={`${cardClass} space-y-3`}>
-              {problems.length > 0 && (
-                <p className="text-sm text-muted-foreground">Լրացրեք՝ {problems.join(", ")}</p>
-              )}
+              {problems.length === 0 && (
               <div className="flex flex-wrap gap-2">
                 {canSign && (
                   <button
@@ -394,10 +394,6 @@ export function SalesFormView() {
                   {sending && !canSign ? "Ուղարկվում է…" : "Միայն սևագիր"}
                 </button>
               </div>
-              {!canSign && (
-                <p className="text-xs text-muted-foreground">
-                  Տերմինալից ստորագրելու համար ադմինկայում (Users) լրացրեք CoSign, Mobile ID կամ Նիկիտա։
-                </p>
               )}
               {result && (
                 <p className={`rounded-md px-3 py-2 text-sm ${result.ok ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
@@ -406,6 +402,7 @@ export function SalesFormView() {
                 </p>
               )}
             </div>
+            )}
 
           </div>
         </main>

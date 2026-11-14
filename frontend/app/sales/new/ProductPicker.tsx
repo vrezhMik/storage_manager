@@ -45,6 +45,7 @@ export default function ProductPicker({
   const [stockError, setStockError] = useState(false);
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [draft, setDraft] = useState("");
+  const slid = useRef(false);
   const [sliding, setSliding] = useState<string | null>(null);
   const asked = useRef(new Set<string>());
   const gesture = useRef<Gesture | null>(null);
@@ -151,17 +152,25 @@ export default function ProductPicker({
       return copy;
     });
   };
-  const onUp = (item: CatalogItem) => {
+  const onUp = () => {
     const g = gesture.current;
     gesture.current = null;
     if (!g) return;
     window.clearTimeout(g.timer);
-    if (g.held) {
-      setSliding(null);
-    } else if (!g.moved) {
-      setEditing(item);
-      setDraft(qty[keyOf(item)] ? String(qty[keyOf(item)]) : "");
+    // The click that follows a slide must not open the quantity box.
+    slid.current = g.held || g.moved;
+    if (g.held) setSliding(null);
+  };
+  // Opened on click, not on pointerup: otherwise that same click lands on the
+  // quantity box's backdrop and closes it at once.
+  const onTap = (item: CatalogItem) => {
+    if (slid.current) {
+      slid.current = false;
+      return;
     }
+    const q = qty[keyOf(item)];
+    setEditing(item);
+    setDraft(q ? String(q) : "");
   };
   const onCancel = () => {
     if (gesture.current) window.clearTimeout(gesture.current.timer);
@@ -242,8 +251,9 @@ export default function ProductPicker({
                 key={key}
                 onPointerDown={(e) => onDown(e, item)}
                 onPointerMove={onMove}
-                onPointerUp={() => onUp(item)}
+                onPointerUp={onUp}
                 onPointerCancel={onCancel}
+                onClick={() => onTap(item)}
                 onContextMenu={(e) => e.preventDefault()}
                 style={{ touchAction: "pan-y", WebkitTouchCallout: "none" }}
                 className={`flex cursor-pointer select-none items-center gap-3 px-3 py-2 ${
