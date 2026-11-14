@@ -6,7 +6,15 @@ import { fetchDeviceReport } from "../lib/device";
 // from 1C (GET /sales/stock?codes=…, from the device for network-restricted users).
 
 export type CatalogGroup = { id: number; name: string; parent: number | null };
-export type CatalogItem = { code: string; name: string; price: number | null; image: string | null; groups: number[] };
+export type CatalogItem = {
+  code: string;
+  name: string;
+  price: number | null;
+  image: string | null;
+  // A bigger picture for zooming in (catalogs read before it existed lack it).
+  imageLarge?: string | null;
+  groups: number[];
+};
 export type Catalog = { updatedAt: string; groups: CatalogGroup[]; items: CatalogItem[] };
 export type StockInfo = { stock: number | null; unit: string | null; classifierCode: string | null };
 

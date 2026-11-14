@@ -33,6 +33,7 @@ class DbEntry extends Model
         'catalog_url',
         'api_stock',
         'api_partners',
+        'api_sales_order',
         'einvoice_tin',
         'einvoice_login',
         'einvoice_password',

@@ -14,6 +14,7 @@ const STOCK_BATCH = 50; // codes per stock request to 1C
 const HOLD_MS = 350; // press this long before sliding changes the quantity
 const STEP_PX = 28; // slide this far for each unit
 const MOVE_PX = 8; // moving more before the hold means scrolling
+const VIEW_KEY = "flexit.picker.view";
 
 const num = (s: string) => {
   const n = Number(String(s).replace(/\s/g, "").replace(",", "."));
@@ -46,6 +47,23 @@ export default function ProductPicker({
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [draft, setDraft] = useState("");
   const slid = useRef(false);
+  const [zoom, setZoom] = useState<CatalogItem | null>(null);
+  // List (small pictures) or grid (big ones); each device remembers its choice.
+  const [grid, setGrid] = useState(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === "grid";
+    } catch {
+      return false;
+    }
+  });
+  const switchView = (toGrid: boolean) => {
+    setGrid(toGrid);
+    try {
+      localStorage.setItem(VIEW_KEY, toGrid ? "grid" : "list");
+    } catch {
+      // private mode: the choice lasts for this visit only
+    }
+  };
   const [sliding, setSliding] = useState<string | null>(null);
   const asked = useRef(new Set<string>());
   const gesture = useRef<Gesture | null>(null);
@@ -67,10 +85,10 @@ export default function ProductPicker({
   useEffect(() => open(false), []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && (editing ? setEditing(null) : onClose());
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && (zoom ? setZoom(null) : editing ? setEditing(null) : onClose());
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editing, onClose]);
+  }, [zoom, editing, onClose]);
 
   const byCode = useMemo(() => new Map((catalog?.items ?? []).map((i) => [i.code || i.name, i])), [catalog]);
   const groups = useMemo(() => {
@@ -194,6 +212,14 @@ export default function ProductPicker({
       <div className="space-y-2 border-b p-3">
         <div className="flex items-center gap-2">
           <h3 className="flex-1 text-lg font-semibold text-foreground">Ապրանքացանկ</h3>
+          <div className="flex overflow-hidden rounded-md border border-input text-sm" role="group" aria-label="Տեսք">
+            <button type="button" onClick={() => switchView(false)} aria-pressed={!grid} title="Ցուցակ" className={`px-3 py-1.5 ${!grid ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}>
+              ☰
+            </button>
+            <button type="button" onClick={() => switchView(true)} aria-pressed={grid} title="Մեծ նկարներ" className={`px-3 py-1.5 ${grid ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}>
+              ▦
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => open(true)}
@@ -240,12 +266,56 @@ export default function ProductPicker({
         {error && <p className="p-4 text-sm text-red-600">{error}</p>}
         {!catalog && !error && <p className="p-4 text-sm text-muted-foreground">Բեռնվում է…</p>}
         {catalog && shown.length === 0 && <p className="p-4 text-sm text-muted-foreground">Ապրանք չգտնվեց</p>}
-        <ul className="divide-y">
+        <ul className={grid ? "grid grid-cols-2 gap-2 p-2 sm:grid-cols-3 lg:grid-cols-5" : "divide-y"}>
           {visible.map((item) => {
             const key = keyOf(item);
             const q = qty[key] ?? 0;
             const info = item.code ? stock[item.code] : undefined;
             const short = info?.stock != null && q > info.stock;
+            const badge = q > 0 && (
+              <span
+                className={`min-w-[2.5rem] rounded-full px-2 py-1 text-center text-sm font-bold tabular-nums ${
+                  short ? "bg-red-600 text-white" : "bg-primary text-primary-foreground"
+                } ${grid ? "absolute right-2 top-2 shadow" : ""}`}
+              >
+                {formatAmount(q)}
+              </span>
+            );
+            const picture = item.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.image}
+                alt=""
+                loading="lazy"
+                draggable={false}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (slid.current) slid.current = false;
+                  else setZoom(item);
+                }}
+                className={`shrink-0 cursor-zoom-in bg-muted object-cover ${grid ? "aspect-square w-full rounded-t-lg" : "h-14 w-14 rounded-md"}`}
+              />
+            ) : (
+              <div className={`shrink-0 bg-muted ${grid ? "aspect-square w-full rounded-t-lg" : "h-14 w-14 rounded-md"}`} />
+            );
+            const details = (
+              <div className={`min-w-0 flex-1 ${grid ? "p-2" : ""}`}>
+                <p className="line-clamp-2 text-sm font-medium text-foreground">{item.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {item.price != null ? `${formatAmount(item.price)} ֏` : "գին չկա"}
+                  {grid ? <br /> : " · "}
+                  {!item.code ? (
+                    <span className="text-amber-700">կոդ չկա</span>
+                  ) : info ? (
+                    <span className={short ? "font-semibold text-red-600" : ""}>
+                      մնացորդ՝ {info.stock ?? "—"} {info.unit ?? ""}
+                    </span>
+                  ) : (
+                    "մնացորդ՝ …"
+                  )}
+                </p>
+              </div>
+            );
             return (
               <li
                 key={key}
@@ -256,37 +326,13 @@ export default function ProductPicker({
                 onClick={() => onTap(item)}
                 onContextMenu={(e) => e.preventDefault()}
                 style={{ touchAction: "pan-y", WebkitTouchCallout: "none" }}
-                className={`flex cursor-pointer select-none items-center gap-3 px-3 py-2 ${
-                  sliding === key ? "bg-primary/10" : q > 0 ? "bg-green-50" : ""
-                }`}
+                className={`cursor-pointer select-none ${
+                  grid ? "relative flex flex-col overflow-hidden rounded-lg border" : "flex items-center gap-3 px-3 py-2"
+                } ${sliding === key ? "bg-primary/10" : q > 0 ? "bg-green-50" : ""} ${grid && q > 0 ? "border-primary" : ""}`}
               >
-                {item.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.image} alt="" loading="lazy" draggable={false} className="h-14 w-14 shrink-0 rounded-md bg-muted object-cover" />
-                ) : (
-                  <div className="h-14 w-14 shrink-0 rounded-md bg-muted" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-medium text-foreground">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {item.price != null ? `${formatAmount(item.price)} ֏` : "գին չկա"}
-                    {" · "}
-                    {!item.code ? (
-                      <span className="text-amber-700">կոդ չկա</span>
-                    ) : info ? (
-                      <span className={short ? "font-semibold text-red-600" : ""}>
-                        մնացորդ՝ {info.stock ?? "—"} {info.unit ?? ""}
-                      </span>
-                    ) : (
-                      "մնացորդ՝ …"
-                    )}
-                  </p>
-                </div>
-                {q > 0 && (
-                  <span className={`min-w-[2.5rem] rounded-full px-2 py-1 text-center text-sm font-bold tabular-nums ${short ? "bg-red-600 text-white" : "bg-primary text-primary-foreground"}`}>
-                    {formatAmount(q)}
-                  </span>
-                )}
+                {picture}
+                {details}
+                {badge}
               </li>
             );
           })}
@@ -319,6 +365,15 @@ export default function ProductPicker({
           Պատրաստ
         </button>
       </div>
+
+      {zoom && (
+        <div className="fixed inset-0 z-[115] flex flex-col items-center justify-center gap-3 bg-black/90 p-4" onClick={() => setZoom(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={zoom.imageLarge || zoom.image || ""} alt={zoom.name} className="max-h-[75vh] max-w-full rounded-lg object-contain" />
+          <p className="max-w-lg text-center text-sm text-white">{zoom.name}</p>
+          {zoom.price != null && <p className="text-lg font-semibold text-white">{formatAmount(zoom.price)} ֏</p>}
+        </div>
+      )}
 
       {editing && (
         <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setEditing(null)}>

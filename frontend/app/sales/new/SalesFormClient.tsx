@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import type { Route } from "next";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthGuard from "../../components/AuthGuard";
 import { API_BASE, authFetch } from "../../lib/auth";
 import { formatAmount } from "../../reports/sales/salesData";
 import { createDraftOnDevice, startSigningOnDevice } from "../einvoiceDevice";
 import { Partner } from "../catalog";
+import { errorMessage, loadOrder, saveOrder, sendOrder } from "../salesOrders";
 import BuyerPicker from "./BuyerPicker";
 import ProductPicker, { PickedLine } from "./ProductPicker";
 import { cardClass, CONFIRM_SIGN, DocType, errorText, SignMethod, hasSrcExtension, nativeBridge, SrcSessionError, srcFetch, TYPE_LABELS } from "../salesShared";
@@ -51,6 +52,35 @@ export function SalesFormView() {
   // Goods come only from the catalog; services are still typed in rows.
   const [picked, setPicked] = useState<PickedLine[]>([]);
   const canSign = signMethod !== null;
+  // /sales/new/?order=ID opens a saved sale to change or send it.
+  const orderParam = Number(useSearchParams().get("order")) || null;
+  const [orderId, setOrderId] = useState<number | null>(orderParam);
+  const [orderLoading, setOrderLoading] = useState(orderParam !== null);
+
+  useEffect(() => {
+    if (!orderParam) return;
+    loadOrder(orderParam)
+      .then((o) => {
+        if (o.status === "SENT") {
+          router.replace("/sales/orders/" as Route);
+          return;
+        }
+        setBuyerTin(o.buyerTin ?? "");
+        setBuyerName(o.buyerName);
+        setBuyerAddress(o.buyerAddress ?? "");
+        setDeliveredAt(o.deliveredAt ?? today());
+        setAdditionalInfo(o.comment ?? "");
+        setPicked(
+          o.items.map((i) => ({
+            item: { code: i.code, name: i.name, price: i.price, image: i.image, groups: [] },
+            quantity: i.quantity,
+            info: { stock: null, unit: i.unit, classifierCode: i.classifierCode },
+          })),
+        );
+      })
+      .catch(() => setResult({ ok: false, text: "Չհաջողվեց բացել պահպանված վաճառքը" }))
+      .finally(() => setOrderLoading(false));
+  }, [orderParam, router]);
 
   const goods = type === "ACC_DOC_GOODS";
   const pickedSum = (p: PickedLine) => Math.round(p.quantity * (p.item.price ?? 0) * 100) / 100;
@@ -126,6 +156,53 @@ export function SalesFormView() {
           rows.some((r) => num(r.unitPrice) < 0 || r.unitPrice.trim() === "") && "Բոլոր տողերի գինը",
         ]),
   ].filter(Boolean) as string[];
+
+  // A sale for 1C needs a buyer and priced goods; the TIN only if typed in.
+  const orderReady =
+    goods && buyerName.trim() !== "" && (buyerTin === "" || /^\d{8}$/.test(buyerTin)) && picked.length > 0 && picked.every((p) => p.item.price != null);
+
+  // "Պահպանել" keeps the sale in the terminal; "Ուղարկել 1C" also sends it.
+  const saveSale = async (toOneC: boolean) => {
+    if (!orderReady || sending) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const saved = await saveOrder(
+        {
+          buyerTin: buyerTin || null,
+          buyerName: buyerName.trim(),
+          buyerAddress: buyerAddress.trim() || null,
+          deliveredAt: deliveredAt || null,
+          comment: additionalInfo.trim() || null,
+          items: picked.map((p) => ({
+            code: p.item.code,
+            name: p.item.name,
+            unit: p.info?.unit ?? null,
+            classifierCode: p.info?.classifierCode ?? null,
+            image: p.item.image,
+            quantity: p.quantity,
+            price: p.item.price ?? 0,
+          })),
+        },
+        orderId ?? undefined,
+      );
+      setOrderId(saved.id);
+      if (!toOneC) {
+        router.push("/sales/orders/?saved=1" as Route);
+        return;
+      }
+      const sent = await sendOrder(saved.id);
+      if (sent.status === "SENT") {
+        router.push("/sales/orders/" as Route);
+        return;
+      }
+      setResult({ ok: false, text: `Պահպանված է, բայց 1C-ն չընդունեց. ${sent.error ?? ""}` });
+    } catch (err) {
+      setResult({ ok: false, text: errorMessage(err) });
+    } finally {
+      setSending(false);
+    }
+  };
 
   const send = async (sign: boolean) => {
     if (problems.length > 0 || sending) return;
@@ -207,10 +284,11 @@ export function SalesFormView() {
           <div className="space-y-4">
             <div className={`${cardClass} space-y-3`}>
               <div>
-                <Link href={"/sales" as Route} className="text-xs font-medium text-primary hover:underline">
-                  ← Վաճառքներ
+                <Link href={"/sales/orders" as Route} className="text-xs font-medium text-primary hover:underline">
+                  ← Պատվերներ
                 </Link>
-                <h2 className="text-xl font-semibold text-foreground">Նոր հաշիվ-վավերագիր</h2>
+                <h2 className="text-xl font-semibold text-foreground">{orderId ? `Վաճառք №${orderId}` : "Նոր վաճառք"}</h2>
+                {orderLoading && <p className="text-sm text-muted-foreground">Բեռնվում է…</p>}
               </div>
               <div className="flex flex-wrap gap-2">
                 {TYPES.map((t) => (
@@ -369,16 +447,37 @@ export function SalesFormView() {
             </div>
 
             {/* The buttons appear once the buyer and the goods are filled in. */}
-            {(problems.length === 0 || result) && (
+            {(orderReady || problems.length === 0 || result) && (
             <div className={`${cardClass} space-y-3`}>
+              {orderReady && (
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <button
+                    type="button"
+                    onClick={() => saveSale(false)}
+                    disabled={sending}
+                    className="inline-flex items-center justify-center rounded-md border border-input px-5 py-3 text-sm font-medium shadow hover:bg-accent disabled:opacity-50"
+                  >
+                    💾 Պահպանել
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => saveSale(true)}
+                    disabled={sending}
+                    className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    {sending ? "Ուղարկվում է…" : "📤 Ուղարկել 1C"}
+                  </button>
+                </div>
+              )}
               {problems.length === 0 && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                <span className="text-xs text-muted-foreground">ՊԵԿ հաշիվ-վավերագիր՝</span>
                 {canSign && (
                   <button
                     type="button"
                     onClick={() => send(true)}
                     disabled={problems.length > 0 || sending}
-                    className="inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90 disabled:opacity-50"
+                    className="inline-flex items-center justify-center rounded-md border border-input px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
                   >
                     {sending ? "Ուղարկվում է…" : "✍ Ստեղծել և ստորագրել"}
                   </button>
@@ -387,9 +486,7 @@ export function SalesFormView() {
                   type="button"
                   onClick={() => send(false)}
                   disabled={problems.length > 0 || sending}
-                  className={`inline-flex items-center justify-center rounded-md px-5 py-2.5 text-sm font-medium shadow disabled:opacity-50 ${
-                    canSign ? "border border-input hover:bg-accent" : "bg-primary text-primary-foreground hover:bg-primary/90"
-                  }`}
+                  className="inline-flex items-center justify-center rounded-md border border-input px-4 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
                 >
                   {sending && !canSign ? "Ուղարկվում է…" : "Միայն սևագիր"}
                 </button>

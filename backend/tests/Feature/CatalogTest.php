@@ -102,6 +102,7 @@ class CatalogTest extends TestCase
                 'name' => 'Փական “V-189”',
                 'price' => 6800,
                 'image' => 'https://shop.test/s-150.jpg',
+                'imageLarge' => 'https://shop.test/big.jpg',
                 'groups' => [5, 6],
             ])
             ->assertJsonPath('items.1.code', 'ЦБ-2')

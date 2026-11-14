@@ -118,6 +118,10 @@ class DbEntryResource extends Resource
                 ->label('API: Partners')
                 ->helperText('Manager (the user\'s "1C manager") is added when set, e.g. http://host:port/terminal/hs/Eportal/Partners. Answer: [{"TIN","Name","Address"}].')
                 ->maxLength(255),
+            Forms\Components\TextInput::make('api_sales_order')
+                ->label('API: Sales order (POST)')
+                ->helperText('The terminal\'s "Ուղարկել 1C" posts {BuyerTIN, BuyerName, Date, Comment, Manager, Items:[{Code, Quantity, Price}]} here, e.g. http://host:port/terminal/hs/Eportal/SalesOrder. Answer: {"Number","Ref"} or {"Error"}.')
+                ->maxLength(255),
             Forms\Components\Textarea::make('allowed_ips')
                 ->label('Allowed IPs (company network)')
                 ->helperText('The company\'s public IPs, one per line (ranges like 203.0.113.0/24 work). For users marked "Միայն կազմակերպության ցանցից". Empty = those users are refused.')

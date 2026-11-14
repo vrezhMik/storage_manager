@@ -3,6 +3,7 @@ import Link from "next/link";
 
 // Switches "Վաճառքներ" between account documents and cash register receipts.
 const TABS = [
+  { key: "orders", href: "/sales/orders", label: "Պատվերներ" },
   { key: "docs", href: "/sales", label: "Հաշիվ-վավերագրեր" },
   { key: "hdm", href: "/sales/hdm", label: "ՀԴՄ կտրոններ" },
 ] as const;

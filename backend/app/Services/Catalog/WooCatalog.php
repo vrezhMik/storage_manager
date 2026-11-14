@@ -39,6 +39,7 @@ class WooCatalog
                 'name' => $this->text($p['name'] ?? ''),
                 'price' => $this->price($p['prices'] ?? []),
                 'image' => $this->smallImage($p['images'][0] ?? null),
+                'imageLarge' => $this->largeImage($p['images'][0] ?? null),
                 'groups' => array_map(fn ($c) => (int) $c['id'], $p['categories'] ?? []),
             ], array_filter($this->pages($root.'/products'), fn ($p) => ($p['type'] ?? 'simple') !== 'variation')),
         ];
@@ -113,5 +114,22 @@ class WooCatalog
         }
 
         return $best[0] ?? ($image['thumbnail'] ?? $image['src'] ?? null);
+    }
+
+    // For zooming in: the smallest picture at least 700px wide, else the full one.
+    private function largeImage(?array $image): ?string
+    {
+        if (! $image) {
+            return null;
+        }
+
+        $best = null;
+        foreach (explode(',', (string) ($image['srcset'] ?? '')) as $candidate) {
+            if (preg_match('/^\s*(\S+)\s+(\d+)w\s*$/', $candidate, $m) && (int) $m[2] >= 700 && ($best === null || (int) $m[2] < $best[1])) {
+                $best = [$m[1], (int) $m[2]];
+            }
+        }
+
+        return $best[0] ?? ($image['src'] ?? $image['thumbnail'] ?? null);
     }
 }

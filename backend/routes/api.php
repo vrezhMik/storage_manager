@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\EhdmController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SalesController;
+use App\Http\Controllers\Api\SalesOrderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function () {
@@ -36,6 +37,13 @@ Route::middleware(['auth.jwt', 'section:sales'])->prefix('sales')->group(functio
     Route::get('catalog', [CatalogController::class, 'index']);
     Route::get('stock', [CatalogController::class, 'stock']);
     Route::get('partners', [CatalogController::class, 'partners']);
+    Route::get('orders', [SalesOrderController::class, 'index']);
+    Route::post('orders', [SalesOrderController::class, 'store']);
+    Route::get('orders/{order}', [SalesOrderController::class, 'show']);
+    Route::put('orders/{order}', [SalesOrderController::class, 'update']);
+    Route::delete('orders/{order}', [SalesOrderController::class, 'destroy']);
+    Route::post('orders/{order}/send', [SalesOrderController::class, 'send']);
+    Route::post('orders/{order}/device-result', [SalesOrderController::class, 'deviceResult']);
     Route::get('documents', [SalesController::class, 'documents']);
     Route::post('documents', [SalesController::class, 'store']);
     Route::post('documents/{document}/sign', [SalesController::class, 'sign']);
