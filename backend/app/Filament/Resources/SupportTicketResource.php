@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\SupportTicketResource\Pages;
 use App\Jobs\MailSupportReply;
+use App\Models\SupportCustomer;
 use App\Models\SupportResponse;
 use App\Models\SupportTicket;
 use App\Services\Support\SupportTelegram;
@@ -91,6 +92,12 @@ class SupportTicketResource extends Resource
             ->defaultSort('id', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->options(SupportTicket::STATUS_LABELS),
+                Tables\Filters\SelectFilter::make('support_customer_id')
+                    ->label('Հաճախորդ')
+                    ->relationship('customer', 'email')
+                    ->getOptionLabelFromRecordUsing(fn (SupportCustomer $c) => $c->fullName().($c->company ? ' · '.$c->company : '').' · '.$c->email)
+                    ->searchable()
+                    ->preload(),
             ])
             ->poll('30s')
             ->actions([
@@ -171,8 +178,9 @@ class SupportTicketResource extends Resource
         if (! empty($data['solve'])) {
             $record->fill(['status' => SupportTicket::STATUS_SOLVED, 'solved_at' => now()]);
         }
-        $record->touch();
-        $record->save();
+        // Quietly: this reply already emails the customer, the "solved" email would be a second one.
+        $record->updated_at = now();
+        $record->saveQuietly();
 
         if ($record->support_customer_id) {
             MailSupportReply::dispatch($response->id);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\MailSupportSolved;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -90,6 +91,13 @@ class SupportTicket extends Model
     {
         static::creating(function (self $ticket): void {
             $ticket->token ??= (string) Str::uuid();
+        });
+
+        // Marked solved from Telegram or the admin panel: the customer is told by email.
+        static::updated(function (self $ticket): void {
+            if ($ticket->wasChanged('status') && $ticket->status === self::STATUS_SOLVED && $ticket->support_customer_id) {
+                MailSupportSolved::dispatch($ticket->id);
+            }
         });
     }
 

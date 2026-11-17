@@ -141,6 +141,28 @@ class SupportPortalTest extends TestCase
         $this->assertStringContainsString('ani@example.test', $mails[0]->getEnvelope()->getRecipients()[0]->getAddress());
     }
 
+    public function test_marking_solved_emails_the_customer_once(): void
+    {
+        $token = $this->signUp();
+        $new = fn () => $this->postJson('/api/support/portal/tickets', [
+            'title' => 'Թեմա', 'product' => '1C:Մանրածախ', 'priority' => 'normal', 'description' => 'Նկարագրություն այստեղ',
+        ], $this->as($token))->json('id');
+
+        // From the admin panel's Edit (or Telegram): one "solved" email.
+        $a = SupportTicket::find($new());
+        $a->update(['status' => 'solved']);
+        $this->assertCount(1, $this->sentMail());
+        $this->assertStringContainsString('լուծված է', $this->sentMail()[0]->getOriginalMessage()->getSubject());
+
+        // A reply that also marks it solved: only the reply's email.
+        \App\Filament\Resources\SupportTicketResource::reply(SupportTicket::find($new()), ['body' => 'Ուղղված է', 'solve' => true]);
+        $this->assertCount(2, $this->sentMail());
+
+        // The customer closing it themselves: no email.
+        $this->postJson('/api/support/portal/tickets/'.$new().'/close', [], $this->as($token))->assertOk();
+        $this->assertCount(2, $this->sentMail());
+    }
+
     public function test_password_reset_by_email(): void
     {
         $this->signUp();

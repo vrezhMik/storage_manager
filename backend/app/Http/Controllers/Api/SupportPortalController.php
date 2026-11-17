@@ -176,7 +176,8 @@ class SupportPortalController extends Controller
     public function close(Request $request, int $id): JsonResponse
     {
         $ticket = $this->ticket($request, $id);
-        $ticket->update(['status' => SupportTicket::STATUS_SOLVED, 'solved_at' => $ticket->solved_at ?? now(), 'closed_at' => now()]);
+        // The customer closed it themselves: no "solved" email.
+        $ticket->forceFill(['status' => SupportTicket::STATUS_SOLVED, 'solved_at' => $ticket->solved_at ?? now(), 'closed_at' => now()])->saveQuietly();
 
         return response()->json($ticket->load('responses')->toPortal(true));
     }

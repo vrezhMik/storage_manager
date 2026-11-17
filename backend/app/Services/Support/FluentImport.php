@@ -7,6 +7,7 @@ use App\Models\SupportResponse;
 use App\Models\SupportTicket;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Brings Fluent Support's customers, tickets and replies (exported from
@@ -74,8 +75,11 @@ class FluentImport
                     'created_at' => $created,
                     'updated_at' => ! empty($t['updated_at']) ? Carbon::parse($t['updated_at']) : $created,
                 ]);
+                // Quietly, so no "solved" emails go out; the token is set here
+                // because the model's creating event does not run.
+                $ticket->token ??= (string) Str::uuid();
                 $ticket->timestamps = false;
-                $ticket->save();
+                $ticket->saveQuietly();
                 $counts['tickets']++;
 
                 foreach ($t['responses'] ?? [] as $r) {
