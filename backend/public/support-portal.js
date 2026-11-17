@@ -330,6 +330,9 @@
     return h("style", { text: [
       ".fxp{max-width:820px;margin:0 auto;font-size:16px;color:#12372a;text-align:left}",
       ".fxp *{box-sizing:border-box}",
+      // The site theme capitalises buttons and draws inputs as underlines; the portal keeps its own look.
+      ".fxp button{text-transform:none!important;letter-spacing:normal!important;box-shadow:none!important}",
+      ".fxp input[type=text],.fxp input[type=email],.fxp input[type=tel],.fxp input[type=password],.fxp select,.fxp textarea{border:1px solid #cfdcd5!important;background-image:none!important;height:auto!important}",
       ".fxp-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}",
       ".fxp-tabs button,.fxp-actions button{padding:10px 16px;border:1px solid #cfdcd5;border-radius:10px;background:#fff;color:#12372a;font:inherit;cursor:pointer}",
       ".fxp-tabs button.on{background:#0b6b45;border-color:#0b6b45;color:#fff;font-weight:700}",
