@@ -47,6 +47,7 @@ class SupportTicketController extends Controller
             'tin' => $data['tin'] ?? null,
             'product' => $data['product'],
             'urgent' => (bool) ($data['urgent'] ?? false),
+            'priority' => ($data['urgent'] ?? false) ? 'critical' : 'normal',
             'description' => trim($data['description']),
             'source' => $data['source'] ?? null,
             'ip' => $request->ip(),

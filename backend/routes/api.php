@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\EhdmController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SalesController;
 use App\Http\Controllers\Api\SalesOrderController;
+use App\Http\Controllers\Api\SupportPortalController;
 use App\Http\Controllers\Api\SupportTicketController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,29 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('throttle:5,1')->post('support/tickets', [SupportTicketController::class, 'store']);
 Route::middleware('throttle:30,1')->get('support/tickets/{token}', [SupportTicketController::class, 'show']);
 Route::post('telegram/support/{secret}', [SupportTicketController::class, 'telegram']);
+
+// The customer support portal (replaces Fluent Support on flexit.am).
+Route::prefix('support/portal')->group(function (): void {
+    Route::middleware('throttle:10,1')->group(function (): void {
+        Route::post('register', [SupportPortalController::class, 'register']);
+        Route::post('login', [SupportPortalController::class, 'login']);
+        Route::post('password/forgot', [SupportPortalController::class, 'forgotPassword']);
+        Route::post('password/reset', [SupportPortalController::class, 'resetPassword']);
+    });
+    Route::get('files/{owner}/{id}/{index}', [SupportPortalController::class, 'file'])
+        ->whereIn('owner', ['ticket', 'response'])->whereNumber(['id', 'index'])->name('support-portal-file');
+
+    Route::middleware(['support.customer', 'throttle:120,1'])->group(function (): void {
+        Route::post('logout', [SupportPortalController::class, 'logout']);
+        Route::get('me', [SupportPortalController::class, 'me']);
+        Route::put('me', [SupportPortalController::class, 'updateProfile']);
+        Route::get('tickets', [SupportPortalController::class, 'tickets']);
+        Route::post('tickets', [SupportPortalController::class, 'createTicket'])->middleware('throttle:10,1');
+        Route::get('tickets/{id}', [SupportPortalController::class, 'showTicket'])->whereNumber('id');
+        Route::post('tickets/{id}/responses', [SupportPortalController::class, 'reply'])->whereNumber('id')->middleware('throttle:20,1');
+        Route::post('tickets/{id}/close', [SupportPortalController::class, 'close'])->whereNumber('id');
+    });
+});
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);

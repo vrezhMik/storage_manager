@@ -39,7 +39,7 @@ class SupportTelegram
         $ticket->forceFill(['telegram_message_id' => $messageId])->save();
 
         foreach ($ticket->attachments ?? [] as $i => $path) {
-            if (! Storage::disk('local')->exists($path)) {
+            if (! is_string($path) || ! Storage::disk('local')->exists($path)) {
                 continue;
             }
             $this->upload('sendPhoto', 'photo', Storage::disk('local')->get($path), basename($path), [
@@ -47,6 +47,29 @@ class SupportTelegram
                 'caption' => '№'.$ticket->id.' · '.($i + 1),
                 'reply_to_message_id' => $messageId,
             ]);
+        }
+    }
+
+    // A customer's reply in the portal, under the ticket's message.
+    public function postResponse(SupportTicket $ticket, \App\Models\SupportResponse $response): void
+    {
+        $e = fn (?string $s) => htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $sent = $this->call('sendMessage', array_filter([
+            'chat_id' => $this->chatId(),
+            'text' => '💬 <b>Հայտ №'.$ticket->id.'</b> · նոր պատասխան՝ '.$e($response->author_name)."\n\n"
+                .$e(mb_strimwidth($response->body, 0, 3000, '…')),
+            'parse_mode' => 'HTML',
+            'reply_to_message_id' => $ticket->telegram_message_id,
+            'allow_sending_without_reply' => true,
+        ]));
+        foreach ($response->attachments ?? [] as $i => $path) {
+            if (is_string($path) && Storage::disk('local')->exists($path)) {
+                $this->upload('sendPhoto', 'photo', Storage::disk('local')->get($path), basename($path), [
+                    'chat_id' => $this->chatId(),
+                    'caption' => '№'.$ticket->id.' · '.($i + 1),
+                    'reply_to_message_id' => $sent->json('result.message_id'),
+                ]);
+            }
         }
     }
 
@@ -88,11 +111,16 @@ class SupportTelegram
     public function text(SupportTicket $ticket): string
     {
         $e = fn (?string $s) => htmlspecialchars((string) $s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $urgent = $ticket->urgent || $ticket->priority === 'critical';
         $lines = [
-            ($ticket->urgent ? '🔴 <b>ՇՏԱՊ</b> · ' : '🆕 ').'<b>Հայտ №'.$ticket->id.'</b>',
-            '👤 '.$e($ticket->name).($ticket->company ? ' · '.$e($ticket->company) : ''),
-            '📞 '.$e($ticket->phone),
+            ($urgent ? '🔴 <b>ՇՏԱՊ</b> · ' : '🆕 ').'<b>Հայտ №'.$ticket->id.'</b>'
+                .($ticket->customer?->contract ? ' · ⭐ պայմանագրային' : ''),
         ];
+        if ($ticket->title) {
+            $lines[] = '<b>'.$e($ticket->title).'</b>';
+        }
+        $lines[] = '👤 '.$e($ticket->name).($ticket->company ? ' · '.$e($ticket->company) : '');
+        $lines[] = '📞 '.$e($ticket->phone).($ticket->customer?->email ? ' · '.$e($ticket->customer->email) : '');
         if ($ticket->tin) {
             $lines[] = '🏷 ՀՎՀՀ '.$e($ticket->tin);
         }

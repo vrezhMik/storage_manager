@@ -60,6 +60,11 @@ return [
         'webhook_secret' => env('SUPPORT_TELEGRAM_WEBHOOK_SECRET'),
     ],
 
+    // The page on flexit.am that holds the support portal (links in emails).
+    'support_portal' => [
+        'url' => env('SUPPORT_PORTAL_URL', 'https://flexit.am/arm/1c-cragir-xndir/'),
+    ],
+
     'ehdm' => [
         'live_url' => env('EHDM_LIVE_URL', 'https://ecrm.taxservice.am/taxsystem-rs-vcr'),
         'test_url' => env('EHDM_TEST_URL', 'https://10.3.14.123:447'),

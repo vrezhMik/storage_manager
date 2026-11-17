@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth.jwt' => \App\Http\Middleware\AuthenticateJwt::class,
             'section' => \App\Http\Middleware\EnsureSectionAccess::class,
+            'support.customer' => \App\Http\Middleware\AuthenticateSupportCustomer::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
