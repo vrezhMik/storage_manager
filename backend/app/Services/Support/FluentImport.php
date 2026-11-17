@@ -130,6 +130,13 @@ class FluentImport
     // Fluent Support keeps HTML; the portal shows plain text with line breaks.
     public static function text(string $html): string
     {
+        // Pictures pasted into the text and links keep their address.
+        $html = preg_replace('#<img[^>]*\ssrc="([^"]+)"[^>]*>#i', "\n🖼 $1\n", $html);
+        $html = preg_replace_callback('#<a[^>]*\shref="([^"]+)"[^>]*>(.*?)</a>#is', function ($m) {
+            $label = trim(strip_tags($m[2]));
+
+            return ($label === '' || $label === $m[1]) ? $m[1] : $label.' ('.$m[1].')';
+        }, $html);
         $html = preg_replace('#<(br|/p|/div|/li|/h[1-6])\s*/?>#i', "\n", $html);
         $html = preg_replace('#<li[^>]*>#i', '• ', $html);
         $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');

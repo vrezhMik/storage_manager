@@ -157,6 +157,14 @@ class SupportPortalTest extends TestCase
         $this->postJson('/api/support/portal/password/reset', ['email' => 'ani@example.test', 'token' => $m[1], 'password' => 'again-secret'])->assertStatus(422);
     }
 
+    public function test_fluent_html_keeps_pictures_and_links(): void
+    {
+        $this->assertSame(
+            "Ուղղված է\n🖼 http://flexit.am/a.png\n\nՆկար (https://prnt.sc/x) և https://e.am",
+            FluentImport::text('<p>Ուղղված է<img style="width:300px" src="http://flexit.am/a.png" alt="x" /></p><p><a href="https://prnt.sc/x" target="_blank">Նկար</a> և <a href="https://e.am">https://e.am</a></p>')
+        );
+    }
+
     public function test_fluent_support_import_keeps_history_and_passwords(): void
     {
         $export = [
