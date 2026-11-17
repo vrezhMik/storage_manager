@@ -42,7 +42,7 @@ class SupportTelegram
             if (! is_string($path) || ! Storage::disk('local')->exists($path)) {
                 continue;
             }
-            $this->upload('sendPhoto', 'photo', Storage::disk('local')->get($path), basename($path), [
+            $this->upload(SupportTicket::isImage($path) ? 'sendPhoto' : 'sendDocument', SupportTicket::isImage($path) ? 'photo' : 'document', Storage::disk('local')->get($path), SupportTicket::fileLabel($path, $i), [
                 'chat_id' => $this->chatId(),
                 'caption' => '№'.$ticket->id.' · '.($i + 1),
                 'reply_to_message_id' => $messageId,
@@ -64,7 +64,7 @@ class SupportTelegram
         ]));
         foreach ($response->attachments ?? [] as $i => $path) {
             if (is_string($path) && Storage::disk('local')->exists($path)) {
-                $this->upload('sendPhoto', 'photo', Storage::disk('local')->get($path), basename($path), [
+                $this->upload(SupportTicket::isImage($path) ? 'sendPhoto' : 'sendDocument', SupportTicket::isImage($path) ? 'photo' : 'document', Storage::disk('local')->get($path), SupportTicket::fileLabel($path, $i), [
                     'chat_id' => $this->chatId(),
                     'caption' => '№'.$ticket->id.' · '.($i + 1),
                     'reply_to_message_id' => $sent->json('result.message_id'),

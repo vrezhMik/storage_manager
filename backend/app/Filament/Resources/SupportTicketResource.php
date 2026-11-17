@@ -109,13 +109,14 @@ class SupportTicketResource extends Resource
                     ->schema([
                         Forms\Components\Textarea::make('body')->label('Պատասխան')->rows(5)->required(),
                         Forms\Components\FileUpload::make('files')
-                            ->label('Նկարներ')
+                            ->label('Ֆայլեր (նկար, Excel, PDF, Word)')
                             ->disk('local')
                             ->directory('support/staff')
-                            ->image()
+                            ->acceptedFileTypes(SupportTicket::ATTACHMENT_MIMES)
+                            ->getUploadedFileNameForStorageUsing(fn ($file) => SupportTicket::storedName($file->getClientOriginalName(), $file->getClientOriginalExtension()))
                             ->multiple()
                             ->maxFiles(3)
-                            ->maxSize(5120),
+                            ->maxSize(10240),
                         Forms\Components\Checkbox::make('solve')->label('Նշել լուծված'),
                     ])
                     ->action(fn (SupportTicket $record, array $data) => static::reply($record, $data)),
@@ -136,7 +137,8 @@ class SupportTicketResource extends Resource
         $links = [];
         foreach ($record->attachments ?? [] as $i => $path) {
             $url = is_array($path) ? $path['url'] : route('support-files', [$record->id, $i]);
-            $links[] = '<a href="'.e($url).'" target="_blank" style="text-decoration:underline">Նկար '.($i + 1).'</a>';
+            $label = is_array($path) ? ($path['name'] ?? 'Ֆայլ') : SupportTicket::fileLabel($path, $i);
+            $links[] = '<a href="'.e($url).'" target="_blank" style="text-decoration:underline">'.e($label).'</a>';
         }
 
         return $links ? '<br><br>📎 '.implode(' · ', $links) : '';

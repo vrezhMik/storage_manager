@@ -81,12 +81,12 @@
       return h("option", { value: v, text: l, selected: v === value });
     }));
   }
-  function fileInput() { return h("input", { type: "file", name: "files[]", multiple: true, accept: "image/jpeg,image/png,image/webp" }); }
+  function fileInput() { return h("input", { type: "file", name: "files[]", multiple: true, accept: "image/jpeg,image/png,image/webp,.pdf,.xls,.xlsx,.csv,.doc,.docx" }); }
   function filesOk(form, box) {
     var f = form.querySelector('input[type=file]');
     if (!f) return true;
-    if (f.files.length > 3) { show(box, "Կարելի է կցել մինչև 3 նկար։"); return false; }
-    for (var i = 0; i < f.files.length; i++) if (f.files[i].size > 5 * 1024 * 1024) { show(box, "Նկարը պետք է լինի 5 ՄԲ-ից փոքր։"); return false; }
+    if (f.files.length > 3) { show(box, "Կարելի է կցել մինչև 3 ֆայլ։"); return false; }
+    for (var i = 0; i < f.files.length; i++) if (f.files[i].size > 10 * 1024 * 1024) { show(box, "Ֆայլը պետք է լինի 10 ՄԲ-ից փոքր։"); return false; }
     return true;
   }
   function show(box, text, ok) { box.textContent = text; box.className = "fxp-msg " + (ok ? "ok" : "err"); box.hidden = !text; }
@@ -252,7 +252,7 @@
       field("Թեմա *", input("title", "text", { required: true, maxlength: 190 })),
       h("div", { class: "fxp-row" }, [field("1C ծրագիրը *", select("product", PRODUCTS)), field("Կարևորություն", select("priority", PRIORITIES, "normal"))]),
       field("Նկարագրություն *", h("textarea", { name: "description", required: true, minlength: 10, placeholder: "Ինչ եք անում, ինչ է կատարվում, ինչ սխալ է գրում" })),
-      field("Էկրանի նկար (մինչև 3)", fileInput()),
+      field("Ֆայլեր՝ նկար, Excel, PDF, Word (մինչև 3)", fileInput()),
       msg, btn,
     ]);
     mount(h("div", { class: "fxp" }, [header(), form]));
@@ -285,7 +285,7 @@
         .catch(function (err) { show(msg, errorText(err, "Չհաջողվեց ուղարկել։")); busy(btn, false, "Ուղարկել"); });
     } }, [
       field(t.status === "solved" ? "Գրեք, եթե խնդիրը կրկնվում է (հայտը նորից կբացվի)" : "Ձեր պատասխանը", h("textarea", { name: "body", required: true })),
-      field("Նկար (մինչև 3)", fileInput()),
+      field("Ֆայլեր՝ նկար, Excel, PDF, Word (մինչև 3)", fileInput()),
       msg,
       h("div", { class: "fxp-actions" }, [btn, (t.status === "new" || t.status === "in_progress") ? h("button", { type: "button", text: "Փակել հայտը", onclick: function () {
         if (!confirm("Փակե՞լ հայտը։")) return;

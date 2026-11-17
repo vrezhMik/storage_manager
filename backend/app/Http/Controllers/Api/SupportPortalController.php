@@ -24,7 +24,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class SupportPortalController extends Controller
 {
-    private const FILES = ['files' => ['nullable', 'array', 'max:3'], 'files.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120']];
+    private const FILES = ['files' => ['nullable', 'array', 'max:3'], 'files.*' => ['file', 'mimes:'.SupportTicket::ATTACHMENT_TYPES, 'max:10240']];
 
     public function register(Request $request): JsonResponse
     {
@@ -230,7 +230,10 @@ class SupportPortalController extends Controller
         $path = ($model->attachments ?? [])[$index] ?? null;
         abort_unless(is_string($path) && Storage::disk('local')->exists($path), Response::HTTP_NOT_FOUND);
 
-        return Storage::disk('local')->response($path);
+        // Pictures open in the browser; Excel, PDF and Word download under their own name.
+        return SupportTicket::isImage($path)
+            ? Storage::disk('local')->response($path)
+            : Storage::disk('local')->download($path, SupportTicket::fileLabel($path, $index));
     }
 
     private function customer(Request $request): SupportCustomer
@@ -247,7 +250,7 @@ class SupportPortalController extends Controller
     {
         $paths = [];
         foreach ($request->file('files', []) as $file) {
-            $paths[] = $file->storeAs($dir, Str::random(24).'.'.$file->extension(), 'local');
+            $paths[] = $file->storeAs($dir, SupportTicket::storedName($file->getClientOriginalName(), $file->extension()), 'local');
         }
 
         return $paths;

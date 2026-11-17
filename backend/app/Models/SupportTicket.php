@@ -121,6 +121,35 @@ class SupportTicket extends Model
         return in_array($this->status, [self::STATUS_NEW, self::STATUS_IN_PROGRESS], true);
     }
 
+    // What customers and the team may attach: pictures, Excel, PDF, Word.
+    public const ATTACHMENT_TYPES = 'jpg,jpeg,png,webp,pdf,xls,xlsx,csv,doc,docx';
+
+    public const ATTACHMENT_MIMES = [
+        'image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/csv', 'text/plain',
+        'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
+
+    // A stored file keeps its original name after "__", behind a random part.
+    public static function storedName(string $original, string $extension): string
+    {
+        $base = preg_replace('/[^\p{L}\p{N}._-]+/u', '_', pathinfo($original, PATHINFO_FILENAME));
+
+        return Str::random(12).'__'.(mb_substr(trim($base, '._'), 0, 80) ?: 'file').'.'.strtolower($extension);
+    }
+
+    public static function fileLabel(string $path, int $index): string
+    {
+        $name = basename($path);
+
+        return str_contains($name, '__') ? substr($name, strpos($name, '__') + 2) : 'Նկար '.($index + 1);
+    }
+
+    public static function isImage(string $path): bool
+    {
+        return in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['jpg', 'jpeg', 'png', 'webp'], true);
+    }
+
     /**
      * Attachment links for the portal: our own files through a signed link
      * that works for an hour, files brought over from Fluent Support as they were.
@@ -131,7 +160,7 @@ class SupportTicket extends Model
         foreach ($attachments ?? [] as $i => $file) {
             $links[] = is_array($file)
                 ? ['name' => $file['name'] ?? 'file', 'url' => $file['url']]
-                : ['name' => 'Նկար '.($i + 1), 'url' => URL::temporarySignedRoute('support-portal-file', now()->addHour(), [
+                : ['name' => self::fileLabel($file, $i), 'url' => URL::temporarySignedRoute('support-portal-file', now()->addHour(), [
                     'owner' => $owner, 'id' => $ownerId, 'index' => $i,
                 ])];
         }

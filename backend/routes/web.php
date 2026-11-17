@@ -14,5 +14,5 @@ Route::get('/support-files/{ticket}/{index}', function (SupportTicket $ticket, i
     $path = ($ticket->attachments ?? [])[$index] ?? null;
     abort_unless($path && Storage::disk('local')->exists($path), 404);
 
-    return Storage::disk('local')->response($path);
+    return SupportTicket::isImage($path) ? Storage::disk('local')->response($path) : Storage::disk('local')->download($path, SupportTicket::fileLabel($path, $index));
 })->whereNumber('index')->name('support-files');

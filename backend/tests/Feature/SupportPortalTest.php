@@ -109,6 +109,24 @@ class SupportPortalTest extends TestCase
         $this->getJson('/api/support/portal/tickets', $this->as($token))->assertJsonCount(1, 'tickets');
     }
 
+    public function test_excel_files_keep_their_name_and_go_to_telegram_as_documents(): void
+    {
+        $token = $this->signUp();
+        $ticket = $this->post('/api/support/portal/tickets', [
+            'title' => 'Մնացորդներ', 'product' => '1C:Առևտրի կառավարում', 'priority' => 'normal', 'description' => 'Կցում եմ աղյուսակը',
+            'files' => [UploadedFile::fake()->create('Հաշվետվություն 2026.xlsx', 100, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+        ], $this->as($token))->assertCreated();
+
+        $this->assertSame('Հաշվետվություն_2026.xlsx', $ticket->json('files.0.name'));
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/sendDocument'));
+        $this->get($ticket->json('files.0.url'))->assertOk()->assertDownload();
+
+        $this->post('/api/support/portal/tickets', [
+            'title' => 'Ծրագիր', 'product' => '1C:Մանրածախ', 'priority' => 'normal', 'description' => 'Ահա ֆայլը',
+            'files' => [UploadedFile::fake()->create('tool.exe', 10, 'application/x-msdownload')],
+        ], $this->as($token))->assertStatus(422);
+    }
+
     public function test_customers_see_only_their_own_tickets(): void
     {
         $ani = $this->signUp('ani@example.test');
