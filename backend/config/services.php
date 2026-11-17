@@ -52,6 +52,14 @@ return [
     // The tax service's electronic cash register (e-ՀԴՄ) web service. It only
     // accepts the IP registered for the register, with its client certificate.
     // The test system is on the tax service's internal network.
+    // "Խնդրի գրանցում" tickets go to this bot's chat (a group or a person).
+    // Send /chatid to the bot to learn the chat id.
+    'support_telegram' => [
+        'token' => env('SUPPORT_TELEGRAM_BOT_TOKEN'),
+        'chat_id' => env('SUPPORT_TELEGRAM_CHAT_ID'),
+        'webhook_secret' => env('SUPPORT_TELEGRAM_WEBHOOK_SECRET'),
+    ],
+
     'ehdm' => [
         'live_url' => env('EHDM_LIVE_URL', 'https://ecrm.taxservice.am/taxsystem-rs-vcr'),
         'test_url' => env('EHDM_TEST_URL', 'https://10.3.14.123:447'),

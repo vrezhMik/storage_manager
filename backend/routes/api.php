@@ -7,7 +7,13 @@ use App\Http\Controllers\Api\EhdmController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SalesController;
 use App\Http\Controllers\Api\SalesOrderController;
+use App\Http\Controllers\Api\SupportTicketController;
 use Illuminate\Support\Facades\Route;
+
+// "Խնդրի գրանցում" on flexit.am: open to anyone, limited per IP.
+Route::middleware('throttle:5,1')->post('support/tickets', [SupportTicketController::class, 'store']);
+Route::middleware('throttle:30,1')->get('support/tickets/{token}', [SupportTicketController::class, 'show']);
+Route::post('telegram/support/{secret}', [SupportTicketController::class, 'telegram']);
 
 Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login']);
