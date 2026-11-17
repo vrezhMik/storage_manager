@@ -34,7 +34,7 @@ class SupportPortalController extends Controller
             'firstName' => ['required', 'string', 'max:120'],
             'lastName' => ['nullable', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:190', Rule::unique('support_customers', 'email')],
-            'phone' => ['nullable', 'string', 'max:32', 'regex:/^[0-9+()\-\s]{6,32}$/'],
+            'phone' => ['required', 'string', 'max:32', 'regex:/^[0-9+()\-\s]{6,32}$/'],
             'company' => ['nullable', 'string', 'max:160'],
             'password' => ['required', 'string', 'min:8', 'max:190'],
         ]);

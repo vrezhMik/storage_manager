@@ -102,8 +102,9 @@
   // ---------- guest views ----------
   function guest(tab) {
     tab = tab || "login";
-    var tabs = [["login", "Մուտք"], ["register", "Գրանցում"], ["quick", "Հայտ առանց գրանցման"]];
-    var body = tab === "login" ? loginView() : tab === "register" ? registerView() : quickView();
+    // Problems are registered only by signed-in customers.
+    var tabs = [["login", "Մուտք"], ["register", "Գրանցում"]];
+    var body = tab === "register" ? registerView() : loginView();
     mount(h("div", { class: "fxp" }, [
       h("div", { class: "fxp-tabs" }, tabs.map(function (t) {
         return h("button", { type: "button", class: t[0] === tab ? "on" : "", text: t[1], onclick: function () { guest(t[0]); } });
@@ -143,7 +144,7 @@
       }).then(signedIn).catch(function (err) { show(msg, errorText(err)); busy(btn, false, "Գրանցվել"); });
     } }, [
       h("div", { class: "fxp-row" }, [field("Անուն *", input("firstName", "text", { required: true })), field("Ազգանուն", input("lastName"))]),
-      h("div", { class: "fxp-row" }, [field("Email *", input("email", "email", { required: true, autocomplete: "email" })), field("Հեռախոս", input("phone", "tel", { placeholder: "+374 ..." }))]),
+      h("div", { class: "fxp-row" }, [field("Email *", input("email", "email", { required: true, autocomplete: "email" })), field("Հեռախոս *", input("phone", "tel", { required: true, placeholder: "+374 ..." }))]),
       field("Ընկերություն", input("company")),
       field("Գաղտնաբառ *", input("password", "password", { required: true, minlength: 8, autocomplete: "new-password" }), "Առնվազն 8 նիշ"),
       msg, btn,
@@ -184,40 +185,6 @@
       msg, btn,
     ]);
     mount(h("div", { class: "fxp" }, [form]));
-  }
-
-  // Anyone, without an account: the open form that goes to the team in Telegram.
-  function quickView() {
-    var msg = h("div", { class: "fxp-msg", hidden: true });
-    var btn = h("button", { type: "submit", class: "fxp-primary", text: "Գրանցել խնդիրը" });
-    var form = h("form", { class: "fxp-card", onsubmit: function (e) {
-      e.preventDefault();
-      if (!filesOk(form, msg)) return;
-      var data = new FormData(form);
-      data.append("source", params.get("utm_source") || document.referrer || "flexit.am");
-      busy(btn, true, "Ուղարկվում է…");
-      fetch(API + "/tickets", { method: "POST", body: data, headers: { Accept: "application/json" } })
-        .then(function (r) { return r.json().then(function (b) { if (!r.ok) { var er = new Error(); er.status = r.status; er.data = b; throw er; } return b; }); })
-        .then(function (b) {
-          var link = location.origin + location.pathname + "?ticket=" + b.token;
-          mount(h("div", { class: "fxp" }, [h("div", { class: "fxp-msg ok big" }, [
-            h("b", { text: "Շնորհակալություն։ Հայտ №" + b.id + "-ը ընդունված է։" }), h("br"),
-            "Մեր մասնագետը շատ արագ կկապվի ձեզ հետ " + data.get("phone") + " համարով։", h("br"),
-            h("a", { href: link, text: "Հայտի կարգավիճակը" }),
-          ])]));
-        })
-        .catch(function (err) { show(msg, errorText(err, "Ստուգեք դաշտերը. անունը, հեռախոսը և նկարագրությունը պարտադիր են։")); busy(btn, false, "Գրանցել խնդիրը"); });
-    } }, [
-      h("div", { class: "fxp-row" }, [field("Անուն *", input("name", "text", { required: true })), field("Հեռախոս *", input("phone", "tel", { required: true, placeholder: "+374 ..." }))]),
-      h("div", { class: "fxp-row" }, [field("Ընկերություն", input("company")), field("ՀՎՀՀ", input("tin", "text", { inputmode: "numeric", maxlength: 8 }))]),
-      field("1C ծրագիրը *", select("product", PRODUCTS)),
-      field("Նկարագրեք խնդիրը *", h("textarea", { name: "description", required: true, minlength: 10, placeholder: "Ինչ եք անում, ինչ է կատարվում, ինչ սխալ է գրում" })),
-      field("Էկրանի նկար (մինչև 3)", fileInput()),
-      h("label", { class: "fxp-urgent" }, [input("urgent", "checkbox", { value: "1" }), " Շտապ է՝ աշխատանքը կանգնած է"]),
-      h("input", { class: "fxp-hp", type: "text", name: "website", tabindex: "-1", autocomplete: "off" }),
-      msg, btn,
-    ]);
-    return form;
   }
 
   // ---------- signed-in views ----------
@@ -414,6 +381,6 @@
     api("GET", "/portal/me").then(function (me) { state.customer = me; params.get("ticket_id") ? ticketView(params.get("ticket_id")) : listView(); })
       .catch(function () { guest("login"); });
   } else {
-    guest(params.get("ticket_id") ? "login" : "quick");
+    guest("login");
   }
 })();
